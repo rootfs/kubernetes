@@ -98,6 +98,9 @@ type VolumeSource struct {
 	GCEPersistentDisk *GCEPersistentDisk `json:"persistentDisk" description:"GCE disk resource attached to the host machine on demand"`
 	// GitRepo represents a git repository at a particular revision.
 	GitRepo *GitRepo `json:"gitRepo" description:"git repository at a particular revision"`
+	// ISCSIDisk represents an ISCSI Disk resource that is attached to a
+	// kubelet's host machine and then exposed to the pod.
+	ISCSIDisk *ISCSIDisk `json:"iscsiDisk"`
 }
 
 // HostPath represents bare host directory volume.
@@ -138,6 +141,15 @@ type GCEPersistentDisk struct {
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
 	ReadOnly bool `json:"readOnly,omitempty" description:"read-only if true, read-write otherwise (false or unspecified)"`
+}
+
+// A ISCSI Disk can only be mounted as read/write once.
+type ISCSIDisk struct {
+	Portal string `json:"portal,omitempty"`
+	IQN    string `json:"iqn,omitempty"`
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
 // GitRepo represents a volume that is pulled from git when the pod is created.

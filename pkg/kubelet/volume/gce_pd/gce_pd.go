@@ -158,7 +158,7 @@ func (pd *gcePersistentDisk) SetUp() error {
 	}
 
 	// TODO: handle failed mounts here.
-	mountpoint, err := isMountPoint(pd.GetPath())
+	mountpoint, err := IsMountPoint(pd.GetPath())
 	glog.V(4).Infof("PersistentDisk set up: %s %v %v", pd.GetPath(), mountpoint, err)
 	if err != nil && !os.IsNotExist(err) {
 		return err
@@ -207,7 +207,7 @@ func (pd *gcePersistentDisk) GetPath() string {
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
 func (pd *gcePersistentDisk) TearDown() error {
-	mountpoint, err := isMountPoint(pd.GetPath())
+	mountpoint, err := IsMountPoint(pd.GetPath())
 	if err != nil {
 		return err
 	}
@@ -215,7 +215,7 @@ func (pd *gcePersistentDisk) TearDown() error {
 		return os.RemoveAll(pd.GetPath())
 	}
 
-	devicePath, refCount, err := getMountRefCount(pd.mounter, pd.GetPath())
+	devicePath, refCount, err := GetMountRefCount(pd.mounter, pd.GetPath())
 	if err != nil {
 		return err
 	}

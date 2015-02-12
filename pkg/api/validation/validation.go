@@ -76,6 +76,10 @@ func validateSource(source *api.VolumeSource) errs.ValidationErrorList {
 		numVolumes++
 		allErrs = append(allErrs, validateGCEPersistentDisk(source.GCEPersistentDisk).Prefix("persistentDisk")...)
 	}
+	if source.ISCSIDisk != nil {
+		numVolumes++
+		allErrs = append(allErrs, validateISCSIDisk(source.ISCSIDisk).Prefix("iscsiDisk")...)
+	}
 	if numVolumes == 0 {
 		// TODO: Enforce that a source is set once we deprecate the implied form.
 		source.EmptyDir = &api.EmptyDir{}
@@ -97,6 +101,17 @@ func validateGitRepo(gitRepo *api.GitRepo) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if gitRepo.Repository == "" {
 		allErrs = append(allErrs, errs.NewFieldRequired("repository", gitRepo.Repository))
+	}
+	return allErrs
+}
+
+func validateISCSIDisk(iscsiDisk *api.ISCSIDisk) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if iscsiDisk.Portal == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("portal", iscsiDisk.Portal))
+	}
+	if iscsiDisk.IQN == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("IQN", iscsiDisk.IQN))
 	}
 	return allErrs
 }

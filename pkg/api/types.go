@@ -165,6 +165,9 @@ type VolumeSource struct {
 	GCEPersistentDisk *GCEPersistentDisk `json:"persistentDisk"`
 	// GitRepo represents a git repository at a particular revision.
 	GitRepo *GitRepo `json:"gitRepo"`
+	// ISCSIDisk represents an ISCSI Disk resource that is attached to a
+	// kubelet's host machine and then exposed to the pod.
+	ISCSIDisk *ISCSIDisk `json:"iscsiDisk"`
 }
 
 // HostPath represents bare host directory volume.
@@ -201,6 +204,15 @@ type GCEPersistentDisk struct {
 	// If omitted, kubelet will attempt to mount the device name.
 	// Ex. For /dev/sda1, this field is "1", for /dev/sda, this field is 0 or empty.
 	Partition int `json:"partition,omitempty"`
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	ReadOnly bool `json:"readOnly,omitempty"`
+}
+
+// A ISCSI Disk can only be mounted as read/write once.
+type ISCSIDisk struct {
+	Portal string `json:"portal,omitempty"`
+	IQN    string `json:"iqn,omitempty"`
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
 	ReadOnly bool `json:"readOnly,omitempty"`
