@@ -1067,6 +1067,9 @@ func init() {
 			if err := s.Convert(&in.GCEPersistentDisk, &out.GCEPersistentDisk, 0); err != nil {
 				return err
 			}
+			if err := s.Convert(&in.ISCSIDisk, &out.ISCSIDisk, 0); err != nil {
+				return err
+			}
 			if err := s.Convert(&in.HostPath, &out.HostDir, 0); err != nil {
 				return err
 			}
@@ -1083,6 +1086,9 @@ func init() {
 				return err
 			}
 			if err := s.Convert(&in.GCEPersistentDisk, &out.GCEPersistentDisk, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ISCSIDisk, &out.ISCSIDisk, 0); err != nil {
 				return err
 			}
 			if err := s.Convert(&in.HostDir, &out.HostPath, 0); err != nil {

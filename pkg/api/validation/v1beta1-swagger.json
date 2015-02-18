@@ -1332,6 +1332,31 @@
      }
     }
    },
+   "v1beta1.ISCSIDisk": {
+    "id": "v1beta1.ISCSIDisk",
+    "required": [
+     "portal",
+     "iqn"
+    ],
+    "properties": {
+     "fsType": {
+      "type": "string"
+     },
+     "lun": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "portal": {
+      "type": "string"
+     },
+     "readOnly": {
+      "type": "boolean"
+     },
+     "iqn": {
+      "type": "string"
+     }
+    }
+   },
    "v1beta1.HTTPGetAction": {
     "id": "v1beta1.HTTPGetAction",
     "properties": {
@@ -2074,7 +2099,8 @@
      "hostDir",
      "emptyDir",
      "persistentDisk",
-     "gitRepo"
+     "gitRepo",
+     "iscsiDisk"
     ],
     "properties": {
      "emptyDir": {
@@ -2088,7 +2114,10 @@
      },
      "persistentDisk": {
       "type": "v1beta1.GCEPersistentDisk"
-     }
+     },
+     "iscsiDisk": {
+      "type": "v1beta1.ISCSIDisk"
+     }	
     }
    }
   }
