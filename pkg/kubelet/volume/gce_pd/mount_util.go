@@ -23,7 +23,7 @@ import (
 // Examines /proc/mounts to find the source device of the PD resource and the
 // number of references to that device. Returns both the full device path under
 // the /dev tree and the number of references.
-func getMountRefCount(mounter mount.Interface, mountPath string) (string, int, error) {
+func GetMountRefCount(mounter mount.Interface, mountPath string) (string, int, error) {
 	// TODO(jonesdl) This can be split up into two procedures, finding the device path
 	// and finding the number of references. The parsing could also be separated and another
 	// utility could determine if a path is an active mount point.
