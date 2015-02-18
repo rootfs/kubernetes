@@ -197,6 +197,9 @@ type VolumeSource struct {
 	GCEPersistentDisk *GCEPersistentDisk `json:"gcePersistentDisk"`
 	// GitRepo represents a git repository at a particular revision.
 	GitRepo *GitRepo `json:"gitRepo"`
+	// ISCSIDisk represents an ISCSI Disk resource that is attached to a
+	// kubelet's host machine and then exposed to the pod.
+	ISCSIDisk *ISCSIDisk `json:"iscsiDisk"`
 }
 
 // HostPath represents bare host directory volume.
@@ -244,6 +247,17 @@ type GitRepo struct {
 	Repository string `json:"repository"`
 	// Commit hash, this is optional
 	Revision string `json:"revision"`
+}
+
+// A ISCSI Disk can only be mounted as read/write once.
+type ISCSIDisk struct {
+	Portal string `json:"portal,omitempty"`
+	IQN    string `json:"iqn,omitempty"`
+	Lun    int    `json:"lun,omitempty"`
+	FSType string `json:"fsType,omitempty"`
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
 // Port represents a network port in a single container.

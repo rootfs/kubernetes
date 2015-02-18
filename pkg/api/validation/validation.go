@@ -247,6 +247,10 @@ func validateSource(source *api.VolumeSource) errs.ValidationErrorList {
 		numVolumes++
 		allErrs = append(allErrs, validateGCEPersistentDisk(source.GCEPersistentDisk).Prefix("persistentDisk")...)
 	}
+        if source.ISCSIDisk != nil {
+		numVolumes++
+		allErrs = append(allErrs, validateISCSIDisk(source.ISCSIDisk).Prefix("iscsiDisk")...)
+	}
 	if numVolumes != 1 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("", source, "exactly 1 volume type is required"))
 	}
@@ -265,6 +269,23 @@ func validateGitRepo(gitRepo *api.GitRepo) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if gitRepo.Repository == "" {
 		allErrs = append(allErrs, errs.NewFieldRequired("repository", gitRepo.Repository))
+	}
+	return allErrs
+}
+
+func validateISCSIDisk(iscsiDisk *api.ISCSIDisk) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if iscsiDisk.Portal == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("portal", iscsiDisk.Portal))
+	}
+	if iscsiDisk.IQN == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("iqn", iscsiDisk.IQN))
+	}
+	if iscsiDisk.FSType == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("fsType", iscsiDisk.FSType))
+	}
+	if iscsiDisk.Lun < 0 || iscsiDisk.Lun > 255 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("lun", iscsiDisk.Lun, ""))
 	}
 	return allErrs
 }
