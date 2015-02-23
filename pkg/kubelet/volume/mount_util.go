@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package gce_pd
+package volume
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"

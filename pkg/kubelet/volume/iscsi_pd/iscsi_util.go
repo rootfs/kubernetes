@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume/gce_pd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 	"github.com/golang/glog"
 )
@@ -78,7 +77,7 @@ func (util *ISCSIDiskUtil) AttachDisk(iscsi *iscsiDisk) error {
 	}
 	// mount it
 	globalPDPath := makeGlobalPDName(iscsi.plugin.host, iscsi.portal, iscsi.iqn, iscsi.lun)
-	mountpoint, err := gce_pd.IsMountPoint(globalPDPath)
+	mountpoint, err := volume.IsMountPoint(globalPDPath)
 	if mountpoint {
 		glog.Infof("iscsiPersistentDisk: %s already mounted", globalPDPath)
 		return nil
