@@ -266,6 +266,16 @@ type ISCSIDisk struct {
 	// the ReadOnly setting in VolumeMounts.
 	ReadOnly bool `json:"readOnly,omitempty"`
 }
+// A ISCSI Disk can only be mounted as read/write once.
+type ISCSIDisk struct {
+	Portal string `json:"portal,omitempty"`
+	IQN    string `json:"iqn,omitempty"`
+	Lun    int    `json:"lun,omitempty"`
+	FSType string `json:"fsType,omitempty"`
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	ReadOnly bool `json:"readOnly,omitempty"`
+}
 
 // Port represents a network port in a single container.
 type Port struct {
