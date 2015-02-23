@@ -14,9 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package gce_pd
+package volume
 
 import (
+	"strings"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 )
 
@@ -50,4 +52,41 @@ func GetMountRefCount(mounter mount.Interface, mountPath string) (string, int, e
 		}
 	}
 	return deviceName, refCount, nil
+}
+
+// given a device path, find its reference count from /proc/mounts
+func GetDeviceRefCount(mounter mount.Interface, deviceName string) (int, error) {
+	mps, err := mounter.List()
+	if err != nil {
+		return -1, err
+	}
+
+	// Find the number of references to the device.
+	refCount := 0
+	for i := range mps {
+		if strings.HasPrefix(mps[i].Device, deviceName) {
+			refCount++
+		}
+	}
+	return refCount, nil
+}
+
+// given a device path, find the mount on that device from /proc/mounts
+func GetMountFromDevicePath(mounter mount.Interface, deviceName string) (string, int, error) {
+	// mostly borrowed from gce-pd
+	// export it so other block volume plugin can use it.
+	mps, err := mounter.List()
+	if err != nil {
+		return "", -1, err
+	}
+	mnt := ""
+	// Find the number of references to the device.
+	refCount := 0
+	for i := range mps {
+		if mps[i].Device == deviceName {
+			mnt = mps[i].Path
+			refCount++
+		}
+	}
+	return mnt, refCount, nil
 }

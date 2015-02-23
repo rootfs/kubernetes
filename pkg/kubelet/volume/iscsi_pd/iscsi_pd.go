@@ -23,7 +23,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume/gce_pd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
@@ -172,7 +171,7 @@ func (iscsi *iscsiDisk) SetUp() error {
 
 	globalPDPath := makeGlobalPDName(iscsi.plugin.host, iscsi.portal, iscsi.iqn, iscsi.lun)
 	// TODO: handle failed mounts here.
-	mountpoint, err := gce_pd.IsMountPoint(iscsi.GetPath())
+	mountpoint, err := volume.IsMountPoint(iscsi.GetPath())
 
 	if err != nil && !os.IsNotExist(err) {
 		glog.Errorf("iscsiPersistentDisk: cannot validate mountpoint")
@@ -213,7 +212,7 @@ func (iscsi *iscsiDisk) SetUp() error {
 
 func (iscsi *iscsiDisk) TearDown() error {
 	//glog.Infof("iSCSIPersistentDisk: iscsi path %s", iscsi.GetPath())
-	mountpoint, err := gce_pd.IsMountPoint(iscsi.GetPath())
+	mountpoint, err := volume.IsMountPoint(iscsi.GetPath())
 	if err != nil {
 		glog.Errorf("iSCSIPersistentDisk: cannot validate mountpoint %s", iscsi.GetPath())
 		return err
@@ -222,7 +221,7 @@ func (iscsi *iscsiDisk) TearDown() error {
 		return nil
 	}
 
-	devicePath, refCount, err := gce_pd.GetMountRefCount(iscsi.mounter, iscsi.GetPath())
+	devicePath, refCount, err := volume.GetMountRefCount(iscsi.mounter, iscsi.GetPath())
 	if err != nil {
 		glog.Errorf("iSCSIPersistentDisk: failed to get reference count %s", iscsi.GetPath())
 		return err

@@ -170,7 +170,7 @@ func (pd *gcePersistentDisk) SetUp() error {
 	}
 
 	// TODO: handle failed mounts here.
-	mountpoint, err := IsMountPoint(pd.GetPath())
+	mountpoint, err := volume.IsMountPoint(pd.GetPath())
 	glog.V(4).Infof("PersistentDisk set up: %s %v %v", pd.GetPath(), mountpoint, err)
 	if err != nil && !os.IsNotExist(err) {
 		return err
@@ -199,7 +199,7 @@ func (pd *gcePersistentDisk) SetUp() error {
 	globalPDPath := makeGlobalPDName(pd.plugin.host, pd.pdName, pd.readOnly)
 	err = pd.mounter.Mount(globalPDPath, pd.GetPath(), "", mount.FlagBind|flags, "")
 	if err != nil {
-		mountpoint, mntErr := IsMountPoint(pd.GetPath())
+		mountpoint, mntErr := volume.IsMountPoint(pd.GetPath())
 		if mntErr != nil {
 			glog.Errorf("isMountpoint check failed: %v", mntErr)
 			return err
@@ -209,7 +209,7 @@ func (pd *gcePersistentDisk) SetUp() error {
 				glog.Errorf("Failed to unmount: %v", mntErr)
 				return err
 			}
-			mountpoint, mntErr := IsMountPoint(pd.GetPath())
+			mountpoint, mntErr := volume.IsMountPoint(pd.GetPath())
 			if mntErr != nil {
 				glog.Errorf("isMountpoint check failed: %v", mntErr)
 				return err
@@ -244,7 +244,7 @@ func (pd *gcePersistentDisk) GetPath() string {
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
 func (pd *gcePersistentDisk) TearDown() error {
-	mountpoint, err := IsMountPoint(pd.GetPath())
+	mountpoint, err := volume.IsMountPoint(pd.GetPath())
 	if err != nil {
 		return err
 	}
@@ -252,7 +252,7 @@ func (pd *gcePersistentDisk) TearDown() error {
 		return os.Remove(pd.GetPath())
 	}
 
-	devicePath, refCount, err := GetMountRefCount(pd.mounter, pd.GetPath())
+	devicePath, refCount, err := volume.GetMountRefCount(pd.mounter, pd.GetPath())
 	if err != nil {
 		return err
 	}
@@ -267,7 +267,7 @@ func (pd *gcePersistentDisk) TearDown() error {
 			return err
 		}
 	}
-	mountpoint, mntErr := IsMountPoint(pd.GetPath())
+	mountpoint, mntErr := volume.IsMountPoint(pd.GetPath())
 	if mntErr != nil {
 		glog.Errorf("isMountpoint check failed: %v", mntErr)
 		return err
