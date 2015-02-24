@@ -27,10 +27,6 @@ import (
 	"github.com/golang/glog"
 )
 
-func makeGlobalPDName(host volume.Host, portal string, iqn string, lun string) string {
-	return path.Join(host.GetPluginDir(ISCSIDiskPluginName), "iscsi", portal, iqn, "lun", lun)
-}
-
 func probeDevicePath(devicePath string, maxRetries int) bool {
 	numTries := 0
 	for {
@@ -50,9 +46,19 @@ func probeDevicePath(devicePath string, maxRetries int) bool {
 	return false
 }
 
+func makePDNameInternal(host volume.Host, portal string, iqn string, lun string) string {
+	return path.Join(host.GetPluginDir(ISCSIDiskPluginName), "iscsi", portal, iqn, "lun", lun)
+}
+
 type ISCSIDiskUtil struct{}
 
-func (util *ISCSIDiskUtil) AttachDisk(iscsi *iscsiDisk) error {
+func (util *ISCSIDiskUtil) MakeGlobalPDName(disk interface{}) string {
+	iscsi := disk.(iscsiDisk)
+	return makePDNameInternal(iscsi.plugin.host, iscsi.portal, iscsi.iqn, iscsi.lun)
+}
+
+func (util *ISCSIDiskUtil) AttachDisk(disk interface{}) error {
+	iscsi := disk.(iscsiDisk)
 	devicePath := strings.Join([]string{"/dev/disk/by-path/ip", iscsi.portal, "iscsi", iscsi.iqn, "lun", iscsi.lun}, "-")
 	exist := probeDevicePath(devicePath, 1)
 	if exist == false {
@@ -76,7 +82,7 @@ func (util *ISCSIDiskUtil) AttachDisk(iscsi *iscsiDisk) error {
 		}
 	}
 	// mount it
-	globalPDPath := makeGlobalPDName(iscsi.plugin.host, iscsi.portal, iscsi.iqn, iscsi.lun)
+	globalPDPath := iscsi.manager.MakeGlobalPDName(iscsi)
 	mountpoint, err := volume.IsMountPoint(globalPDPath)
 	if mountpoint {
 		glog.Infof("iscsiPersistentDisk: %s already mounted", globalPDPath)
@@ -97,7 +103,8 @@ func (util *ISCSIDiskUtil) AttachDisk(iscsi *iscsiDisk) error {
 	return err
 }
 
-func (util *ISCSIDiskUtil) DetachDisk(iscsi *iscsiDisk, devicePath string) error {
+func (util *ISCSIDiskUtil) DetachDisk(disk interface{}, devicePath string) error {
+	iscsi := disk.(iscsiDisk)
 	globalPDPath, refCount, err := volume.GetMountFromDevicePath(iscsi.mounter, devicePath)
 	if refCount > 1 {
 		glog.Errorf("iSCSIPersistentDisk detach disk: mount %s is used %d times", globalPDPath, refCount)
