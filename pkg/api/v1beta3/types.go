@@ -257,7 +257,6 @@ type SecretVolumeSource struct {
 	Target ObjectReference `json:"target" description:"target is a reference to a secret"`
 }
 
-
 // A ISCSI Disk can only be mounted as read/write once.
 type ISCSIDiskVolumeSource struct {
 	// iSCSI target portal
