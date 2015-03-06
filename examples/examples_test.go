@@ -154,6 +154,12 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"kitten-rc":   &api.ReplicationController{},
 			"nautilus-rc": &api.ReplicationController{},
 		},
+		"../examples/iscsi/v1beta1": {
+			"iscsi": &api.Pod{},
+		},
+		"../examples/iscsi/v1beta3": {
+			"iscsi": &api.Pod{},
+		},
 	}
 
 	for path, expected := range cases {
@@ -161,7 +167,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 		err := walkJSONFiles(path, func(name, path string, data []byte) {
 			expectedType, found := expected[name]
 			if !found {
-				t.Errorf("%s does not have a test case defined", path)
+				t.Errorf("%s: %s does not have a test case defined", path, name)
 				return
 			}
 			tested += 1
@@ -189,6 +195,7 @@ func TestReadme(t *testing.T) {
 	paths := []string{
 		"../README.md",
 		"../examples/walkthrough/README.md",
+		"../examples/iscsi/README.md",
 	}
 
 	for _, path := range paths {
