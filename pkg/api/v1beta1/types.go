@@ -111,6 +111,8 @@ type VolumeSource struct {
 	Secret *SecretVolumeSource `json:"secret" description:"secret to populate volume with"`
 	// NFS represents an NFS mount on the host that shares a pod's lifetime
 	NFS *NFSVolumeSource `json:"nfs" description:"NFS volume that will be mounted in the host machine "`
+	// Glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime
+	Glusterfs *GlusterfsVolumeSource `json:"glusterfs" description:"Glusterfs volume that will be mounted on the host machine "`
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.
@@ -1359,4 +1361,22 @@ type SecretList struct {
 	TypeMeta `json:",inline"`
 
 	Items []Secret `json:"items" description:"items is a list of secret objects"`
+}
+
+// GlusterfsVolumeSource represents a Glusterfs Mount that lasts the lifetime of a pod
+type GlusterfsVolumeSource struct {
+	// Required: hosts are Glusterfs hosts address array
+	Hosts []string `json:"hosts" description:"gluster hosts array"`
+
+	// Required: Path is the Glusterfs volume path
+	Path string `json:"path" description:"path to gluster volume"`
+
+	// Optional: mountOptions is the mount time options
+	// including readonly
+	MountOpt string `json:"mountOptions,omitempty" description:"mount time options"`
+
+	// Optional: helper is the helper utility to mount command
+	// it can encapsulate the mount command,
+	// so mount can be run in a different namespace, if necessary
+	Helper string `json:"helper,omitempty" description:"helper command to execute mount in a different namespace"`
 }

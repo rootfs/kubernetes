@@ -1,0 +1,37 @@
+{
+    "apiVersion": "v1beta3",
+    "id": "glusterfs",
+    "kind": "Pod",
+    "metadata": {
+        "name": "glusterfs"
+    },
+    "spec": {
+        "containers": [
+            {
+                "name": "glusterfs",
+                "image": "kubernetes/pause",
+                "volumeMounts": [
+                    {
+                        "mountPath": "/mnt/glusterfs",
+                        "name": "glusterfsvol"
+                    }
+                ]
+            }
+        ],
+        "volumes": [
+            {
+                "name": "glusterfsvol",
+                "glusterfs": {
+                    "hosts": [
+                        "10.16.154.81",
+                        "10.16.154.82",
+                        "10.16.154.83"
+                    ],
+                    "path": "kube_vol",
+                    "mountOptions": "",
+                    "helper": ""
+                }
+            }
+        ]
+    }
+}

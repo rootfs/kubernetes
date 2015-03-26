@@ -300,6 +300,10 @@ func validateSource(source *api.VolumeSource) errs.ValidationErrorList {
 		numVolumes++
 		allErrs = append(allErrs, validateNFS(source.NFS).Prefix("nfs")...)
 	}
+	if source.Glusterfs != nil {
+		numVolumes++
+		allErrs = append(allErrs, validateGlusterfs(source.Glusterfs).Prefix("glusterfs")...)
+	}
 	if numVolumes != 1 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("", source, "exactly 1 volume type is required"))
 	}
@@ -354,6 +358,17 @@ func validateNFS(nfs *api.NFSVolumeSource) errs.ValidationErrorList {
 	}
 	if !path.IsAbs(nfs.Path) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("path", nfs.Path, "must be an absolute path"))
+	}
+	return allErrs
+}
+
+func validateGlusterfs(glusterfs *api.GlusterfsVolumeSource) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if len(glusterfs.Hosts) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("hosts"))
+	}
+	if glusterfs.Path == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("path"))
 	}
 	return allErrs
 }

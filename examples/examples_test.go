@@ -160,6 +160,10 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"kitten-rc":   &api.ReplicationController{},
 			"nautilus-rc": &api.ReplicationController{},
 		},
+		"../examples/glusterfs/v1beta3": {
+			"glusterfs":           &api.Pod{},
+			"glusterfs_using_spc": &api.Pod{},
+		},
 	}
 
 	for path, expected := range cases {

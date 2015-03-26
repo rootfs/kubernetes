@@ -193,6 +193,8 @@ type VolumeSource struct {
 	Secret *SecretVolumeSource `json:"secret"`
 	// NFS represents an NFS mount on the host that shares a pod's lifetime
 	NFS *NFSVolumeSource `json:"nfs"`
+	// Glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime
+	Glusterfs *GlusterfsVolumeSource `json:"glusterfs"`
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.
@@ -394,6 +396,24 @@ type NFSVolumeSource struct {
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the NFS export to be mounted with read-only permissions
 	ReadOnly bool `json:"readOnly,omitempty"`
+}
+
+// GlusterfsVolumeSource represents a Glusterfs Mount that lasts the lifetime of a pod
+type GlusterfsVolumeSource struct {
+	// Required: hosts are Glusterfs hosts address array
+	Hosts []string `json:"hosts"`
+
+	// Required: Path is the Glusterfs volume path
+	Path string `json:"path"`
+
+	// Optional: mountOptions is the mount time options
+	// including readonly
+	MountOpt string `json:"mountOptions,omitempty"`
+
+	// Optional: helper is the helper utility to mount command
+	// it can encapsulate the mount command,
+	// so mount can be run in a different namespace, if necessary
+	Helper string `json:"helper,omitempty"`
 }
 
 // ContainerPort represents a network port in a single container
