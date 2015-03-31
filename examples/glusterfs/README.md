@@ -12,7 +12,7 @@ Either install Glusterfs client package on the hosts or run a Super Privileged C
 
 ### Create a POD
 
-See the [v1beta3/](v1beta3/) folder examples.
+The following *volume* spec illustrates a sample configuration.
 
 ```js
 {
@@ -31,6 +31,8 @@ See the [v1beta3/](v1beta3/) folder examples.
 ```
 
 The parameters are explained as the followings. **hosts** is an array of Gluster hosts. **kubelet** is optimized to avoid mount storm, it will randomly pick one from the hosts to mount. If this host is unresponsive, the next host in the array is automatically selected. **path** is the Glusterfs volume name. **mountOption** is the mount time options. **helper** is used if mount is executed inside a Super Privileged Container. This **helper** assumes the name of the Super Proviliged Container is *gluster_spc*.
+
+Detailed POD information can be found at [v1beta3/](v1beta3/)
 
 ```shell
 $ kubectl create -f examples/glusterfs/v1beta3/glusterfs.json

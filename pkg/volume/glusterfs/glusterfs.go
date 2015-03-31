@@ -129,31 +129,14 @@ func (glusterfsVolume *glusterfs) SetUpAt(dir string) error {
 	path := glusterfsVolume.path
 	os.MkdirAll(dir, 0750)
 	err = glusterfsVolume.execMount(glusterfsVolume.hosts, path, dir, glusterfsVolume.option, glusterfsVolume.helper)
-	if err != nil {
-		mountpoint, mntErr := mount.IsMountPoint(dir)
-		if mntErr != nil {
-			glog.Errorf("Glusterfs: IsMountpoint check failed: %v", mntErr)
-			return err
-		}
-		if mountpoint {
-			if mntErr = glusterfsVolume.mounter.Unmount(dir, 0); mntErr != nil {
-				glog.Errorf("Glusterfs: Failed to unmount: %v", mntErr)
-				return err
-			}
-			mountpoint, mntErr := mount.IsMountPoint(dir)
-			if mntErr != nil {
-				glog.Errorf("Glusterfs: IsMountpoint check failed: %v", mntErr)
-				return err
-			}
-			if mountpoint {
-				glog.Errorf("Glusterfs: cannot unmount %s.", dir)
-				return err
-			}
-		}
-		os.Remove(dir)
-		return err
+	if err == nil {
+		return nil
 	}
-	return nil
+
+	// cleanup upon failure
+	glusterfsVolume.cleanup(dir)
+	// return error
+	return err
 }
 
 func (glusterfsVolume *glusterfs) GetPath() string {
@@ -166,13 +149,17 @@ func (glusterfsVolume *glusterfs) TearDown() error {
 }
 
 func (glusterfsVolume *glusterfs) TearDownAt(dir string) error {
+	return glusterfsVolume.cleanup(dir)
+}
+
+func (glusterfsVolume *glusterfs) cleanup(dir string) error {
 	mountpoint, err := mount.IsMountPoint(dir)
 	if err != nil {
 		glog.Errorf("Glusterfs: Error checking IsMountPoint: %v", err)
 		return err
 	}
 	if !mountpoint {
-		return os.Remove(dir)
+		return os.RemoveAll(dir)
 	}
 
 	if err := glusterfsVolume.mounter.Unmount(dir, 0); err != nil {
@@ -185,7 +172,7 @@ func (glusterfsVolume *glusterfs) TearDownAt(dir string) error {
 		return mntErr
 	}
 	if !mountpoint {
-		if err := os.Remove(dir); err != nil {
+		if err := os.RemoveAll(dir); err != nil {
 			return err
 		}
 	}

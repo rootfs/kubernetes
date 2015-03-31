@@ -385,6 +385,8 @@ func TestValidateVolumes(t *testing.T) {
 		t.Errorf("wrong names result: %v", names)
 	}
 	emptyVS := api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}
+	emptyHosts := api.VolumeSource{Glusterfs: &api.GlusterfsVolumeSource{[]string{}, "path", "", ""}}
+	emptyPath := api.VolumeSource{Glusterfs: &api.GlusterfsVolumeSource{[]string{"host"}, "", "", ""}}
 	errorCases := map[string]struct {
 		V []api.Volume
 		T errors.ValidationErrorType
@@ -394,6 +396,8 @@ func TestValidateVolumes(t *testing.T) {
 		"name > 63 characters": {[]api.Volume{{Name: strings.Repeat("a", 64), VolumeSource: emptyVS}}, errors.ValidationErrorTypeInvalid, "[0].name"},
 		"name not a DNS label": {[]api.Volume{{Name: "a.b.c", VolumeSource: emptyVS}}, errors.ValidationErrorTypeInvalid, "[0].name"},
 		"name not unique":      {[]api.Volume{{Name: "abc", VolumeSource: emptyVS}, {Name: "abc", VolumeSource: emptyVS}}, errors.ValidationErrorTypeDuplicate, "[1].name"},
+		"empty hosts":          {[]api.Volume{{Name: "badhost", VolumeSource: emptyHosts}}, errors.ValidationErrorTypeRequired, "[0].source.glusterfs.hosts"},
+		"empty path":           {[]api.Volume{{Name: "badpath", VolumeSource: emptyPath}}, errors.ValidationErrorTypeRequired, "[0].source.glusterfs.path"},
 	}
 	for k, v := range errorCases {
 		_, errs := validateVolumes(v.V)
