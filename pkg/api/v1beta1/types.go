@@ -1371,12 +1371,9 @@ type GlusterfsVolumeSource struct {
 	// Required: Path is the Glusterfs volume path
 	Path string `json:"path" description:"path to gluster volume"`
 
-	// Optional: mountOptions is the mount time options
-	// including readonly
+	// Optional: mountOptions is the mount time options such as "rw" or "ro"
 	MountOpt string `json:"mountOptions,omitempty" description:"mount time options"`
 
-	// Optional: helper is the helper utility to mount command
-	// it can encapsulate the mount command,
-	// so mount can be run in a different namespace, if necessary
-	Helper string `json:"helper,omitempty" description:"helper command to execute mount in a different namespace"`
+	// Optional: helper is the helper utility executed prior to mount command
+	Helper string `json:"helper,omitempty" description:"helper command executed prior to mount"`
 }

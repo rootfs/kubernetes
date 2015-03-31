@@ -161,8 +161,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"nautilus-rc": &api.ReplicationController{},
 		},
 		"../examples/glusterfs/v1beta3": {
-			"glusterfs":           &api.Pod{},
-			"glusterfs_using_spc": &api.Pod{},
+			"glusterfs": &api.Pod{},
 		},
 	}
 
