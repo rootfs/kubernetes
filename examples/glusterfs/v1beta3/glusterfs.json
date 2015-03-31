@@ -22,11 +22,7 @@
             {
                 "name": "glusterfsvol",
                 "glusterfs": {
-                    "hosts": [
-                        "10.16.154.81",
-                        "10.16.154.82",
-                        "10.16.154.83"
-                    ],
+                    "hosts": "glusterfs-cluster",
                     "path": "kube_vol",
                     "mountOptions": "",
                     "helper": ""

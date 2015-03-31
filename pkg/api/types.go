@@ -400,8 +400,8 @@ type NFSVolumeSource struct {
 
 // GlusterfsVolumeSource represents a Glusterfs Mount that lasts the lifetime of a pod
 type GlusterfsVolumeSource struct {
-	// Required: hosts are Glusterfs hosts address array
-	Hosts []string `json:"hosts"`
+	// Required: hosts is the endpoint name that details Glusterfs topology
+	Hosts string `json:"hosts"`
 
 	// Required: Path is the Glusterfs volume path
 	Path string `json:"path"`

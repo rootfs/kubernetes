@@ -75,10 +75,10 @@ func TestPlugin(t *testing.T) {
 	}
 	spec := &api.Volume{
 		Name:         "vol1",
-		VolumeSource: api.VolumeSource{Glusterfs: &api.GlusterfsVolumeSource{[]string{"localhost"}, "vol", "no-op", "echo"}},
+		VolumeSource: api.VolumeSource{Glusterfs: &api.GlusterfsVolumeSource{"ep", "vol", "no-op", "echo"}},
 	}
-
-	builder, err := plug.(*glusterfsPlugin).newBuilderInternal(spec, &api.ObjectReference{UID: types.UID("poduid")}, &mount.FakeMounter{}, exec.New())
+	ep := &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []api.Endpoint{{IP: "127.0.0.1"}}}
+	builder, err := plug.(*glusterfsPlugin).newBuilderInternal(spec, ep, &api.ObjectReference{UID: types.UID("poduid")}, &mount.FakeMounter{}, exec.New())
 	volumePath := builder.GetPath()
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)

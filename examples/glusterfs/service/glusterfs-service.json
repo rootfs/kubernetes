@@ -1,0 +1,19 @@
+{
+    "apiVersion": "v1beta3",
+    "id": "glusterfs",
+    "kind": "Endpoints",
+    "metadata": {
+        "name": "glusterfs-cluster"
+    },
+    "Endpoints": [
+        {
+            "ip": "10.16.154.81"
+        },
+        {
+            "ip": "10.16.154.82"
+        },
+        {
+            "ip": "10.16.154.83"
+        }
+    ]
+}

@@ -288,8 +288,8 @@ type GitRepoVolumeSource struct {
 
 // GlusterfsVolumeSource represents a Glusterfs Mount that lasts the lifetime of a pod
 type GlusterfsVolumeSource struct {
-	// Required: hosts are Glusterfs hosts address array
-	Hosts []string `json:"hosts" description:"gluster hosts array"`
+	// Required: hosts is the endpoint name that details Glusterfs topology
+	Hosts string `json:"hosts" description:"gluster hosts endpoints name"`
 
 	// Required: Path is the Glusterfs volume path
 	Path string `json:"path" description:"path to gluster volume"`

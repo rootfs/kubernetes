@@ -69,13 +69,21 @@ func (plugin *glusterfsPlugin) GetAccessModes() []api.AccessModeType {
 }
 
 func (plugin *glusterfsPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference) (volume.Builder, error) {
-	return plugin.newBuilderInternal(spec, podRef, mount.New(), exec.New())
+	ep_name := spec.VolumeSource.Glusterfs.Hosts
+	ns := api.NamespaceDefault
+	ep, err := plugin.host.GetKubeClient().Endpoints(ns).Get(ep_name)
+	if err != nil {
+		glog.Errorf("Glusterfs: failed to get endpoints %s[%v]", ep_name, err)
+		return nil, err
+	}
+	glog.Infof("Glusterfs: endpoints %v", ep)
+	return plugin.newBuilderInternal(spec, ep, podRef, mount.New(), exec.New())
 }
 
-func (plugin *glusterfsPlugin) newBuilderInternal(spec *api.Volume, podRef *api.ObjectReference, mounter mount.Interface, exe exec.Interface) (volume.Builder, error) {
+func (plugin *glusterfsPlugin) newBuilderInternal(spec *api.Volume, ep *api.Endpoints, podRef *api.ObjectReference, mounter mount.Interface, exe exec.Interface) (volume.Builder, error) {
 	return &glusterfs{
 		volName: spec.Name,
-		hosts:   spec.VolumeSource.Glusterfs.Hosts,
+		hosts:   ep,
 		path:    spec.VolumeSource.Glusterfs.Path,
 		option:  spec.VolumeSource.Glusterfs.MountOpt,
 		helper:  spec.VolumeSource.Glusterfs.Helper,
@@ -103,7 +111,7 @@ func (plugin *glusterfsPlugin) newCleanerInternal(volName string, podUID types.U
 type glusterfs struct {
 	volName string
 	podRef  *api.ObjectReference
-	hosts   []string
+	hosts   *api.Endpoints
 	path    string
 	option  string
 	helper  string
@@ -180,7 +188,7 @@ func (glusterfsVolume *glusterfs) cleanup(dir string) error {
 	return nil
 }
 
-func (glusterfsVolume *glusterfs) execMount(hosts []string, path string, mountpoint string, option string, helper string) error {
+func (glusterfsVolume *glusterfs) execMount(hosts *api.Endpoints, path string, mountpoint string, option string, helper string) error {
 	var errs error
 	var command exec.Cmd
 	var mountArgs []string
@@ -190,20 +198,21 @@ func (glusterfsVolume *glusterfs) execMount(hosts []string, path string, mountpo
 	if option != "" {
 		opt = []string{"-o", option}
 	}
-	l := len(hosts)
+
+	l := len(hosts.Endpoints)
 	// avoid mount storm, pick a host randomly
 	start := rand.Int() % l
 	// iterate all hosts until mount succeeds.
 	for i := start; i < start+l; i++ {
 		if helper == "" {
-			arg := []string{"-t", "glusterfs", hosts[i%l] + ":" + path, mountpoint}
+			arg := []string{"-t", "glusterfs", hosts.Endpoints[i%l].IP + ":" + path, mountpoint}
 			mountArgs = append(arg, opt...)
 			glog.Infof("Glusterfs: mount cmd: mount %v", strings.Join(mountArgs, " "))
 			command = glusterfsVolume.exe.Command("mount", mountArgs...)
 		} else {
 			// if helper is provided, make a cmd like "helper_cmd helper_arg mount -t glusterfs mnt -o option"
 			helper_array := strings.Split(helper, " ")
-			arg := []string{"mount", "-t", "glusterfs", hosts[i%l] + ":" + path, mountpoint}
+			arg := []string{"mount", "-t", "glusterfs", hosts.Endpoints[i%l].IP + ":" + path, mountpoint}
 			mountArgs = append(arg, opt...)
 			args := append(helper_array[1:], mountArgs...)
 			glog.Infof("Glusterfs: mount cmd: %s %v", helper_array[0], strings.Join(args, " "))
