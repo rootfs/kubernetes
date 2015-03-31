@@ -31,6 +31,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
@@ -90,9 +91,16 @@ func NewNodeController(
 	staticResources *api.NodeResources,
 	kubeClient client.Interface,
 	kubeletClient client.KubeletClient,
-	recorder record.EventRecorder,
 	registerRetryCount int,
 	podEvictionTimeout time.Duration) *NodeController {
+	eventBroadcaster := record.NewBroadcaster()
+	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "controllermanager"})
+	if kubeClient != nil {
+		glog.Infof("Sending events to api server.")
+		eventBroadcaster.StartRecordingToSink(kubeClient.Events(""))
+	} else {
+		glog.Infof("No api server defined - no events will be sent to API server.")
+	}
 	return &NodeController{
 		cloud:              cloud,
 		matchRE:            matchRE,
@@ -124,7 +132,6 @@ func (nc *NodeController) Run(period time.Duration, syncNodeList, syncNodeStatus
 	// Register intial set of nodes with their status set.
 	var nodes *api.NodeList
 	var err error
-	record.StartRecording(nc.kubeClient.Events(""))
 	if nc.isRunningCloudProvider() {
 		if syncNodeList {
 			if nodes, err = nc.GetCloudNodesWithSpec(); err != nil {
@@ -292,17 +299,7 @@ func (nc *NodeController) populateNodeInfo(node *api.Node) error {
 		return err
 	}
 	for key, value := range nodeInfo.Capacity {
-		node.Spec.Capacity[key] = value
-	}
-	if node.Status.NodeInfo.BootID != "" &&
-		node.Status.NodeInfo.BootID != nodeInfo.NodeSystemInfo.BootID {
-		ref := &api.ObjectReference{
-			Kind:      "Minion",
-			Name:      node.Name,
-			UID:       node.UID,
-			Namespace: api.NamespaceDefault,
-		}
-		nc.recorder.Eventf(ref, "rebooted", "Node %s has been rebooted", node.Name)
+		node.Status.Capacity[key] = value
 	}
 	node.Status.NodeInfo = nodeInfo.NodeSystemInfo
 	return nil
@@ -323,6 +320,9 @@ func (nc *NodeController) DoCheck(node *api.Node) []api.NodeCondition {
 			// is not a closed loop process, there is no feedback from other components regarding pod
 			// status. Keep listing pods to sanity check if pods are all deleted makes more sense.
 			nc.deletePods(node.Name)
+		}
+		if oldReadyCondition != nil && oldReadyCondition.Status == api.ConditionTrue {
+			nc.recordNodeOfflineEvent(node)
 		}
 	}
 	conditions = append(conditions, *newReadyCondition)
@@ -434,6 +434,18 @@ func (nc *NodeController) PopulateAddresses(nodes *api.NodeList) (*api.NodeList,
 	return nodes, nil
 }
 
+func (nc *NodeController) recordNodeOfflineEvent(node *api.Node) {
+	ref := &api.ObjectReference{
+		Kind:      "Node",
+		Name:      node.Name,
+		UID:       types.UID(node.Name),
+		Namespace: "",
+	}
+	// TODO: This requires a transaction, either both node status is updated
+	// and event is recorded or neither should happen, see issue #6055.
+	nc.recorder.Eventf(ref, "offline", "Node %s is now offline", node.Name)
+}
+
 // MonitorNodeStatus verifies node status are constantly updated by kubelet, and if not,
 // post "NodeReady==ConditionUnknown". It also evicts all pods if node is not ready or
 // not reachable for a long period of time.
@@ -487,6 +499,10 @@ func (nc *NodeController) MonitorNodeStatus() error {
 					readyCondition.LastProbeTime = lastReadyCondition.LastProbeTime
 					readyCondition.LastTransitionTime = nc.now()
 				}
+				if readyCondition.Status != api.ConditionTrue &&
+					lastReadyCondition.Status == api.ConditionTrue {
+					nc.recordNodeOfflineEvent(node)
+				}
 			}
 			_, err = nc.kubeClient.Nodes().Update(node)
 			if err != nil {
@@ -521,8 +537,11 @@ func (nc *NodeController) GetStaticNodesWithSpec() (*api.NodeList, error) {
 		node := api.Node{
 			ObjectMeta: api.ObjectMeta{Name: nodeID},
 			Spec: api.NodeSpec{
-				Capacity:   nc.staticResources.Capacity,
-				ExternalID: nodeID},
+				ExternalID: nodeID,
+			},
+			Status: api.NodeStatus{
+				Capacity: nc.staticResources.Capacity,
+			},
 		}
 		result.Items = append(result.Items, node)
 	}
@@ -553,7 +572,7 @@ func (nc *NodeController) GetCloudNodesWithSpec() (*api.NodeList, error) {
 			resources = nc.staticResources
 		}
 		if resources != nil {
-			node.Spec.Capacity = resources.Capacity
+			node.Status.Capacity = resources.Capacity
 		}
 		instanceID, err := instances.ExternalID(node.Name)
 		if err != nil {

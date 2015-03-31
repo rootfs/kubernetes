@@ -50,8 +50,8 @@ func (podStrategy) NamespaceScoped() bool {
 	return true
 }
 
-// ResetBeforeCreate clears fields that are not allowed to be set by end users on creation.
-func (podStrategy) ResetBeforeCreate(obj runtime.Object) {
+// PrepareForCreate clears fields that are not allowed to be set by end users on creation.
+func (podStrategy) PrepareForCreate(obj runtime.Object) {
 	pod := obj.(*api.Pod)
 	pod.Status = api.PodStatus{
 		Host:  pod.Spec.Host,
@@ -59,8 +59,15 @@ func (podStrategy) ResetBeforeCreate(obj runtime.Object) {
 	}
 }
 
+// PrepareForUpdate clears fields that are not allowed to be set by end users on update.
+func (podStrategy) PrepareForUpdate(obj, old runtime.Object) {
+	newPod := obj.(*api.Pod)
+	oldPod := old.(*api.Pod)
+	newPod.Status = oldPod.Status
+}
+
 // Validate validates a new pod.
-func (podStrategy) Validate(obj runtime.Object) fielderrors.ValidationErrorList {
+func (podStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
 	pod := obj.(*api.Pod)
 	return validation.ValidatePod(pod)
 }
@@ -71,7 +78,7 @@ func (podStrategy) AllowCreateOnUpdate() bool {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (podStrategy) ValidateUpdate(obj, old runtime.Object) fielderrors.ValidationErrorList {
+func (podStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
 	return validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod))
 }
 
@@ -86,7 +93,13 @@ type podStatusStrategy struct {
 
 var StatusStrategy = podStatusStrategy{Strategy}
 
-func (podStatusStrategy) ValidateUpdate(obj, old runtime.Object) fielderrors.ValidationErrorList {
+func (podStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
+	newPod := obj.(*api.Pod)
+	oldPod := old.(*api.Pod)
+	newPod.Spec = oldPod.Spec
+}
+
+func (podStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
 	// TODO: merge valid fields after update
 	return validation.ValidatePodStatusUpdate(obj.(*api.Pod), old.(*api.Pod))
 }

@@ -52,6 +52,14 @@ type Runtime interface {
 	// TODO(yifan): Pull/Remove images
 }
 
+// Container runner is a narrow interface to consume in the Kubelet
+// before there is a full implementation of Runtime.
+//
+// TODO: eventually include this interface in Runtime
+type ContainerRunner interface {
+	RunContainer(pod *api.Pod, container *api.Container, opts *RunContainerOptions) (string, error)
+}
+
 // Pod is a group of containers, with the status of the pod.
 type Pod struct {
 	// The ID of the pod, which can be used to retrieve a particular pod
@@ -87,6 +95,31 @@ type Container struct {
 	// The timestamp of the creation time of the container.
 	// TODO(yifan): Consider to move it to api.ContainerStatus.
 	Created int64
+}
+
+// RunContainerOptions specify the options which are necessary for running containers
+type RunContainerOptions struct {
+	// The environment variables, they are in the form of 'key=value'.
+	Envs []string
+	// The mounts for the containers, they are in the form of:
+	// 'hostPath:containerPath', or
+	// 'hostPath:containerPath:ro', if the path read only.
+	Binds []string
+	// If the container has specified the TerminationMessagePath, then
+	// this directory will be used to create and mount the log file to
+	// container.TerminationMessagePath
+	PodContainerDir string
+	// The list of DNS servers for the container to use.
+	DNS []string
+	// The list of DNS search domains.
+	DNSSearch []string
+	// Docker namespace identifiers(currently we have 'NetMode' and 'IpcMode'.
+	// These are for docker to attach a container in a pod to the pod infra
+	// container's namespace.
+	// TODO(yifan): Remove these after we pushed the pod infra container logic
+	// into docker's container runtime.
+	NetMode string
+	IpcMode string
 }
 
 type Pods []*Pod

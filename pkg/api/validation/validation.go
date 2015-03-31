@@ -232,6 +232,11 @@ func ValidateObjectMetaUpdate(old, meta *api.ObjectMeta) errs.ValidationErrorLis
 		meta.CreationTimestamp = old.CreationTimestamp
 	}
 
+	// Reject updates that don't specify a resource version
+	if meta.ResourceVersion == "" {
+		allErrs = append(allErrs, errs.NewFieldInvalid("resourceVersion", meta.ResourceVersion, "resourceVersion must be specified for an update"))
+	}
+
 	if old.Name != meta.Name {
 		allErrs = append(allErrs, errs.NewFieldInvalid("name", meta.Name, "field is immutable"))
 	}
@@ -925,18 +930,18 @@ func ValidateMinion(node *api.Node) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMeta(&node.ObjectMeta, false, ValidateNodeName).Prefix("metadata")...)
 	// Capacity is required. Within capacity, memory and cpu resources are required.
-	if len(node.Spec.Capacity) == 0 {
-		allErrs = append(allErrs, errs.NewFieldRequired("spec.Capacity"))
+	if len(node.Status.Capacity) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("status.Capacity"))
 	} else {
-		if val, ok := node.Spec.Capacity[api.ResourceMemory]; !ok {
-			allErrs = append(allErrs, errs.NewFieldRequired("spec.Capacity[memory]"))
+		if val, ok := node.Status.Capacity[api.ResourceMemory]; !ok {
+			allErrs = append(allErrs, errs.NewFieldRequired("status.Capacity[memory]"))
 		} else if val.Value() < 0 {
-			allErrs = append(allErrs, errs.NewFieldInvalid("spec.Capacity[memory]", val, "memory capacity cannot be negative"))
+			allErrs = append(allErrs, errs.NewFieldInvalid("status.Capacity[memory]", val, "memory capacity cannot be negative"))
 		}
-		if val, ok := node.Spec.Capacity[api.ResourceCPU]; !ok {
-			allErrs = append(allErrs, errs.NewFieldRequired("spec.Capacity[cpu]"))
+		if val, ok := node.Status.Capacity[api.ResourceCPU]; !ok {
+			allErrs = append(allErrs, errs.NewFieldRequired("status.Capacity[cpu]"))
 		} else if val.Value() < 0 {
-			allErrs = append(allErrs, errs.NewFieldInvalid("spec.Capacity[cpu]", val, "cpu capacity cannot be negative"))
+			allErrs = append(allErrs, errs.NewFieldInvalid("status.Capacity[cpu]", val, "cpu capacity cannot be negative"))
 		}
 	}
 
@@ -964,7 +969,7 @@ func ValidateMinionUpdate(oldMinion *api.Node, minion *api.Node) errs.Validation
 	// Ignore metadata changes now that they have been tested
 	oldMinion.ObjectMeta = minion.ObjectMeta
 	// Allow users to update capacity
-	oldMinion.Spec.Capacity = minion.Spec.Capacity
+	oldMinion.Status.Capacity = minion.Status.Capacity
 	// Allow users to unschedule node
 	oldMinion.Spec.Unschedulable = minion.Spec.Unschedulable
 	// Clear status
@@ -1168,7 +1173,6 @@ func ValidateNamespaceFinalizeUpdate(newNamespace, oldNamespace *api.Namespace) 
 	}
 	newNamespace.ObjectMeta = oldNamespace.ObjectMeta
 	newNamespace.Status = oldNamespace.Status
-	fmt.Printf("NEW NAMESPACE FINALIZERS : %v\n", newNamespace.Spec.Finalizers)
 	return allErrs
 }
 
@@ -1176,6 +1180,28 @@ func ValidateNamespaceFinalizeUpdate(newNamespace, oldNamespace *api.Namespace) 
 func ValidateEndpoints(endpoints *api.Endpoints) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMeta(&endpoints.ObjectMeta, true, ValidateEndpointsName).Prefix("metadata")...)
+	allErrs = append(allErrs, validateEndpointSubsets(endpoints.Subsets).Prefix("subsets")...)
+	return allErrs
+}
+
+func validateEndpointSubsets(subsets []api.EndpointSubset) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+
+	for i := range subsets {
+		ss := &subsets[i]
+
+		ssErrs := errs.ValidationErrorList{}
+
+		if len(ss.Addresses) == 0 {
+			ssErrs = append(ssErrs, errs.NewFieldRequired("addresses"))
+		}
+		if len(ss.Ports) == 0 {
+			ssErrs = append(ssErrs, errs.NewFieldRequired("ports"))
+		}
+		// TODO: validate each address and port
+		allErrs = append(allErrs, ssErrs.PrefixIndex(i)...)
+	}
+
 	return allErrs
 }
 
@@ -1183,5 +1209,6 @@ func ValidateEndpoints(endpoints *api.Endpoints) errs.ValidationErrorList {
 func ValidateEndpointsUpdate(oldEndpoints *api.Endpoints, endpoints *api.Endpoints) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldEndpoints.ObjectMeta, &endpoints.ObjectMeta).Prefix("metadata")...)
+	allErrs = append(allErrs, validateEndpointSubsets(endpoints.Subsets).Prefix("subsets")...)
 	return allErrs
 }

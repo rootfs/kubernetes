@@ -33,12 +33,14 @@ function cleanup()
     [[ -n ${PROXY_PID-} ]] && kill ${PROXY_PID} 1>&2 2>/dev/null
 
     kube::etcd::cleanup
+    rm -rf "${KUBE_TEMP}"
 
     kube::log::status "Clean up complete"
 }
 
 trap cleanup EXIT SIGINT
 
+kube::util::ensure-temp-dir
 kube::etcd::start
 
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
@@ -131,11 +133,13 @@ for version in "${kube_api_versions[@]}"; do
   labels_field="labels"
   service_selector_field="selector"
   rc_replicas_field="desiredState.replicas"
+  port_field="port"
   if [ "$version" = "v1beta3" ]; then
     id_field="metadata.name"
     labels_field="metadata.labels"
     service_selector_field="spec.selector"
     rc_replicas_field="spec.replicas"
+    port_field="spec.port"
   fi
 
   # Passing no arguments to create is an error
@@ -155,6 +159,8 @@ for version in "${kube_api_versions[@]}"; do
   # Post-condition: valid-pod POD is running
   kube::test::get_object_assert pods "{{range.items}}{{.$id_field}}:{{end}}" 'valid-pod:'
   kube::test::get_object_assert 'pod valid-pod' "{{.$id_field}}" 'valid-pod'
+  kube::test::get_object_assert 'pod/valid-pod' "{{.$id_field}}" 'valid-pod'
+  kube::test::get_object_assert 'pods/valid-pod' "{{.$id_field}}" 'valid-pod'
   # Describe command should print detailed information
   kube::test::describe_object_assert pods 'valid-pod' "Name:" "Image(s):" "Host:" "Labels:" "Status:" "Replication Controllers"
 
@@ -307,11 +313,11 @@ for version in "${kube_api_versions[@]}"; do
   # Post-condition: name is still valid-pod
   kube::test::get_object_assert 'pod valid-pod' "{{.${labels_field}.name}}" 'valid-pod'
 
-  ### --overwrite must be used to overwrite existing label
+  ### --overwrite must be used to overwrite existing label, can be applied to all resources
   # Pre-condition: name is valid-pod
   kube::test::get_object_assert 'pod valid-pod' "{{.${labels_field}.name}}" 'valid-pod'
   # Command
-  kubectl label --overwrite pods valid-pod name=valid-pod-super-sayan "${kube_flags[@]}"
+  kubectl label --overwrite pods --all name=valid-pod-super-sayan "${kube_flags[@]}"
   # Post-condition: name is valid-pod-super-sayan
   kube::test::get_object_assert 'pod valid-pod' "{{.${labels_field}.name}}" 'valid-pod-super-sayan'
 
@@ -473,6 +479,26 @@ __EOF__
   # Post-condition: 3 replicas
   kube::test::get_object_assert 'rc frontend-controller' "{{.$rc_replicas_field}}" '3'
 
+  ### Expose replication controller as service
+  # Pre-condition: 3 replicas
+  kube::test::get_object_assert 'rc frontend-controller' "{{.$rc_replicas_field}}" '3'
+  # Command
+  kubectl expose rc frontend-controller --port=80 "${kube_flags[@]}"
+  # Post-condition: service exists
+  kube::test::get_object_assert 'service frontend-controller' "{{.$port_field}}" '80'
+  # Command
+  kubectl expose service frontend-controller --port=443 --service-name=frontend-controller-2 "${kube_flags[@]}"
+  # Post-condition: service exists
+  kube::test::get_object_assert 'service frontend-controller-2' "{{.$port_field}}" '443'
+  # Command
+  kubectl create -f examples/limitrange/valid-pod.json "${kube_flags[@]}"
+  kubectl expose pod valid-pod --port=444 --service-name=frontend-controller-3 "${kube_flags[@]}"
+  # Post-condition: service exists
+  kube::test::get_object_assert 'service frontend-controller-3' "{{.$port_field}}" '444'
+  # Cleanup services
+  kubectl delete pod valid-pod "${kube_flags[@]}"
+  kubectl delete service frontend-controller{,-2,-3} "${kube_flags[@]}"
+
   ### Delete replication controller with id
   # Pre-condition: frontend replication controller is running
   kube::test::get_object_assert rc "{{range.items}}{{.$id_field}}:{{end}}" 'frontend-controller:'
@@ -509,6 +535,7 @@ __EOF__
 
   kube::test::describe_object_assert nodes "127.0.0.1" "Name:" "Labels:" "CreationTimestamp:" "Conditions:" "Addresses:" "Capacity:" "Pods:"
 
+
   ###########
   # Minions #
   ###########
@@ -522,6 +549,28 @@ __EOF__
     kube::test::get_object_assert minions '{{.kind}}' 'List'
 
     kube::test::describe_object_assert minions "127.0.0.1" "Name:" "Conditions:" "Addresses:" "Capacity:" "Pods:"
+  fi
+
+
+  #####################
+  # Retrieve multiple #
+  #####################
+
+  kube::log::status "Testing kubectl(${version}:multiget)"
+  kube::test::get_object_assert 'nodes/127.0.0.1 service/kubernetes' "{{range.items}}{{.$id_field}}:{{end}}" '127.0.0.1:kubernetes:'
+
+
+  ###########
+  # Swagger #
+  ###########
+
+  if [[ -n "${version}" ]]; then
+    # Verify schema
+    file="${KUBE_TEMP}/schema-${version}.json"
+    curl -s "http://127.0.0.1:${API_PORT}/swaggerapi/api/${version}" > "${file}"
+    [[ "$(grep "list of returned" "${file}")" ]]
+    [[ "$(grep "list of pods" "${file}")" ]]
+    [[ "$(grep "watch for changes to the described resources" "${file}")" ]]
   fi
 
   kube::test::clear_all

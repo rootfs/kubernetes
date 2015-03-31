@@ -34,11 +34,15 @@ import (
 
 var _ = Describe("Services", func() {
 	var c *client.Client
+	// Use these in tests.  They're unique for each test to prevent name collisions.
+	var namespace0, namespace1 string
 
 	BeforeEach(func() {
 		var err error
 		c, err = loadClient()
 		Expect(err).NotTo(HaveOccurred())
+		namespace0 = "e2e-ns-" + dateStamp() + "-0"
+		namespace1 = "e2e-ns-" + dateStamp() + "-1"
 	})
 
 	It("should provide DNS for the cluster", func() {
@@ -137,7 +141,7 @@ var _ = Describe("Services", func() {
 				_, err := c.Get().
 					Prefix("proxy").
 					Resource("pods").
-					Namespace("default").
+					Namespace(api.NamespaceDefault).
 					Name(pod.Name).
 					Suffix("results", name).
 					Do().Raw()
@@ -162,7 +166,7 @@ var _ = Describe("Services", func() {
 	It("should provide RW and RO services", func() {
 		svc := api.ServiceList{}
 		err := c.Get().
-			Namespace("default").
+			Namespace(api.NamespaceDefault).
 			AbsPath("/api/v1beta1/proxy/services/kubernetes-ro/api/v1beta1/services").
 			Do().
 			Into(&svc)
@@ -338,8 +342,8 @@ var _ = Describe("Services", func() {
 	})
 
 	It("should correctly serve identically named services in different namespaces on different external IP addresses", func() {
-		serviceNames := []string{"services-namespace-test0"} // Could add more here, but then it takes longer.
-		namespaces := []string{"namespace0", "namespace1"}   // As above.
+		serviceNames := []string{"s0"}                 // Could add more here, but then it takes longer.
+		namespaces := []string{namespace0, namespace1} // As above.
 		labels := map[string]string{
 			"key0": "value0",
 			"key1": "value1",
@@ -352,14 +356,6 @@ var _ = Describe("Services", func() {
 				TargetPort:                 util.NewIntOrStringFromInt(80),
 				CreateExternalLoadBalancer: true,
 			},
-		}
-
-		// Always delete any turds from a previous run.
-		for _, namespace := range namespaces {
-			for _, serviceName := range serviceNames {
-				By("cleanup previous service " + serviceName + " in namespace " + namespace)
-				c.Services(namespace).Delete(serviceName)
-			}
 		}
 
 		publicIPs := []string{}
@@ -394,16 +390,22 @@ func validateUniqueOrFail(s []string) {
 	}
 }
 
-func validateIPsOrFail(c *client.Client, ns string, expectedPort int, expectedEndpoints []string, endpoints *api.Endpoints) {
+func flattenSubsets(subsets []api.EndpointSubset, expectedPort int) util.StringSet {
 	ips := util.StringSet{}
-	for _, ep := range endpoints.Endpoints {
-		if ep.Port != expectedPort {
-			Failf("invalid port, expected %d, got %d", expectedPort, ep.Port)
+	for _, ss := range subsets {
+		for _, port := range ss.Ports {
+			if port.Port == expectedPort {
+				for _, addr := range ss.Addresses {
+					ips.Insert(addr.IP)
+				}
+			}
 		}
-		ips.Insert(ep.IP)
 	}
+	return ips
+}
 
-	for _, name := range expectedEndpoints {
+func validateIPsOrFail(c *client.Client, ns string, expectedPods []string, ips util.StringSet) {
+	for _, name := range expectedPods {
 		pod, err := c.Pods(ns).Get(name)
 		if err != nil {
 			Failf("failed to get pod %s, that's pretty weird. validation failed: %s", name, err)
@@ -413,26 +415,26 @@ func validateIPsOrFail(c *client.Client, ns string, expectedPort int, expectedEn
 		}
 		By(fmt.Sprintf(""))
 	}
-	By(fmt.Sprintf("successfully validated IPs %v against expected endpoints %v port %d on namespace %s", ips, expectedEndpoints, expectedPort, ns))
-
+	By(fmt.Sprintf("successfully validated IPs %v against expected endpoints %v on namespace %s", ips, expectedPods, ns))
 }
 
-func validateEndpointsOrFail(c *client.Client, ns, serviceName string, expectedPort int, expectedEndpoints []string) {
+func validateEndpointsOrFail(c *client.Client, ns, serviceName string, expectedPort int, expectedPods []string) {
 	for {
 		endpoints, err := c.Endpoints(ns).Get(serviceName)
 		if err == nil {
-			if len(endpoints.Endpoints) == len(expectedEndpoints) {
-				validateIPsOrFail(c, ns, expectedPort, expectedEndpoints, endpoints)
-				return
+			ips := flattenSubsets(endpoints.Subsets, expectedPort)
+			if len(ips) == len(expectedPods) {
+				validateIPsOrFail(c, ns, expectedPods, ips)
+				break
 			} else {
-				By(fmt.Sprintf("Unexpected number of endpoints: found %v, expected %v (ignoring for 1 second)", endpoints.Endpoints, expectedEndpoints))
+				By(fmt.Sprintf("Unexpected number of endpoints: found %v, expected %v (ignoring for 1 second)", ips, expectedPods))
 			}
 		} else {
 			By(fmt.Sprintf("Failed to get endpoints: %v (ignoring for 1 second)", err))
 		}
 		time.Sleep(time.Second)
 	}
-	By(fmt.Sprintf("successfully validated endpoints %v port %d on service %s/%s", expectedEndpoints, expectedPort, ns, serviceName))
+	By(fmt.Sprintf("successfully validated endpoints %v port %d on service %s/%s", expectedPods, expectedPort, ns, serviceName))
 }
 
 func addEndpointPodOrFail(c *client.Client, ns, name string, labels map[string]string) {
@@ -454,4 +456,11 @@ func addEndpointPodOrFail(c *client.Client, ns, name string, labels map[string]s
 	}
 	_, err := c.Pods(ns).Create(pod)
 	Expect(err).NotTo(HaveOccurred())
+}
+
+// dateStamp returns the current time as a string "YYYY-MM-DDTHHMMSS"
+// Handy for unique names across test runs
+func dateStamp() string {
+	now := time.Now()
+	return fmt.Sprintf("%04d-%02d-%02dt%02d%02d%02d", now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
 }

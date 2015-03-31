@@ -129,15 +129,21 @@ func TestServiceStorageValidatesCreate(t *testing.T) {
 func TestServiceRegistryUpdate(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	storage, registry, _ := NewTestREST(t, nil)
-	registry.CreateService(ctx, &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
+	svc, err := registry.CreateService(ctx, &api.Service{
+		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1", Namespace: api.NamespaceDefault},
 		Spec: api.ServiceSpec{
 			Port:     6502,
 			Selector: map[string]string{"bar": "baz1"},
 		},
 	})
+
+	if err != nil {
+		t.Fatalf("Expected no error: %v", err)
+	}
 	updated_svc, created, err := storage.Update(ctx, &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		ObjectMeta: api.ObjectMeta{
+			Name:            "foo",
+			ResourceVersion: svc.ResourceVersion},
 		Spec: api.ServiceSpec{
 			Port:            6502,
 			Selector:        map[string]string{"bar": "baz2"},
@@ -305,7 +311,7 @@ func TestServiceRegistryUpdateExternalService(t *testing.T) {
 
 	// Create non-external load balancer.
 	svc1 := &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 		Spec: api.ServiceSpec{
 			Port:                       6502,
 			Selector:                   map[string]string{"bar": "baz"},
@@ -367,13 +373,10 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 					Name:      "foo",
 					Namespace: api.NamespaceDefault,
 				},
-				Endpoints: []api.Endpoint{
-					{
-						IP:   "100.100.100.100",
-						Port: 80,
-					},
-				},
-				Protocol: api.ProtocolTCP,
+				Subsets: []api.EndpointSubset{{
+					Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
+					Ports:     []api.EndpointPort{{Name: "", Port: 80}, {Name: "p", Port: 93}},
+				}},
 			},
 		},
 	}
@@ -385,6 +388,8 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 		},
 	})
 	redirector := rest.Redirector(storage)
+
+	// Test a simple id.
 	location, _, err := redirector.ResourceLocation(ctx, "foo")
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -392,8 +397,26 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 	if location == nil {
 		t.Errorf("Unexpected nil: %v", location)
 	}
-	if e, a := "//100.100.100.100:80", location.String(); e != a {
+	if e, a := "//1.2.3.4:80", location.String(); e != a {
 		t.Errorf("Expected %v, but got %v", e, a)
+	}
+
+	// Test a name + port.
+	location, _, err = redirector.ResourceLocation(ctx, "foo:p")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if location == nil {
+		t.Errorf("Unexpected nil: %v", location)
+	}
+	if e, a := "//1.2.3.4:93", location.String(); e != a {
+		t.Errorf("Expected %v, but got %v", e, a)
+	}
+
+	// Test a non-existent name + port.
+	location, _, err = redirector.ResourceLocation(ctx, "foo:q")
+	if err == nil {
+		t.Errorf("Unexpected nil error")
 	}
 
 	// Test error path
@@ -546,7 +569,7 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 	rest.portalMgr.randomAttempts = 0
 
 	svc := &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
 			Port:            6502,
@@ -589,7 +612,7 @@ func TestServiceRegistryIPExternalLoadBalancer(t *testing.T) {
 	rest.portalMgr.randomAttempts = 0
 
 	svc := &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"bar": "baz"},
 			Port:     6502,

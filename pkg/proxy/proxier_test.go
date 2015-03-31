@@ -199,7 +199,10 @@ func TestTCPProxy(t *testing.T) {
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
-			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: tcpServerPort}},
+			Subsets: []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
+				Ports:     []api.EndpointPort{{Port: tcpServerPort}},
+			}},
 		},
 	})
 
@@ -220,7 +223,10 @@ func TestUDPProxy(t *testing.T) {
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
-			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: udpServerPort}},
+			Subsets: []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
+				Ports:     []api.EndpointPort{{Port: udpServerPort}},
+			}},
 		},
 	})
 
@@ -250,7 +256,10 @@ func TestTCPProxyStop(t *testing.T) {
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Namespace: service.Namespace, Name: service.Name},
-			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: tcpServerPort}},
+			Subsets: []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
+				Ports:     []api.EndpointPort{{Port: tcpServerPort}},
+			}},
 		},
 	})
 
@@ -282,7 +291,10 @@ func TestUDPProxyStop(t *testing.T) {
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Namespace: service.Namespace, Name: service.Name},
-			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: udpServerPort}},
+			Subsets: []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
+				Ports:     []api.EndpointPort{{Port: udpServerPort}},
+			}},
 		},
 	})
 
@@ -314,7 +326,10 @@ func TestTCPProxyUpdateDelete(t *testing.T) {
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Namespace: service.Namespace, Name: service.Name},
-			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: tcpServerPort}},
+			Subsets: []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
+				Ports:     []api.EndpointPort{{Port: tcpServerPort}},
+			}},
 		},
 	})
 
@@ -345,7 +360,10 @@ func TestUDPProxyUpdateDelete(t *testing.T) {
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Namespace: service.Namespace, Name: service.Name},
-			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: udpServerPort}},
+			Subsets: []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
+				Ports:     []api.EndpointPort{{Port: udpServerPort}},
+			}},
 		},
 	})
 
@@ -376,7 +394,10 @@ func TestTCPProxyUpdateDeleteUpdate(t *testing.T) {
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
-			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: tcpServerPort}},
+			Subsets: []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
+				Ports:     []api.EndpointPort{{Port: tcpServerPort}},
+			}},
 		},
 	})
 
@@ -416,7 +437,10 @@ func TestUDPProxyUpdateDeleteUpdate(t *testing.T) {
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
-			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: udpServerPort}},
+			Subsets: []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
+				Ports:     []api.EndpointPort{{Port: udpServerPort}},
+			}},
 		},
 	})
 
@@ -456,7 +480,10 @@ func TestTCPProxyUpdatePort(t *testing.T) {
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
-			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: tcpServerPort}},
+			Subsets: []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
+				Ports:     []api.EndpointPort{{Port: tcpServerPort}},
+			}},
 		},
 	})
 
@@ -493,7 +520,10 @@ func TestUDPProxyUpdatePort(t *testing.T) {
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
-			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: udpServerPort}},
+			Subsets: []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
+				Ports:     []api.EndpointPort{{Port: udpServerPort}},
+			}},
 		},
 	})
 
@@ -521,13 +551,56 @@ func TestUDPProxyUpdatePort(t *testing.T) {
 	waitForNumProxyLoops(t, p, 1)
 }
 
+func TestProxyUpdatePublicIPs(t *testing.T) {
+	lb := NewLoadBalancerRR()
+	service := types.NewNamespacedNameOrDie("testnamespace", "echo")
+	lb.OnUpdate([]api.Endpoints{
+		{
+			ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
+			Subsets: []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
+				Ports:     []api.EndpointPort{{Port: tcpServerPort}},
+			}},
+		},
+	})
+
+	p := CreateProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
+	waitForNumProxyLoops(t, p, 0)
+
+	svcInfo, err := p.addServiceOnPort(service, "TCP", 0, time.Second)
+	if err != nil {
+		t.Fatalf("error adding new service: %#v", err)
+	}
+	testEchoTCP(t, "127.0.0.1", svcInfo.proxyPort)
+	waitForNumProxyLoops(t, p, 1)
+
+	p.OnUpdate([]api.Service{
+		{ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace}, Spec: api.ServiceSpec{Port: svcInfo.portalPort, Protocol: "TCP", PortalIP: svcInfo.portalIP.String(), PublicIPs: []string{"4.3.2.1"}}, Status: api.ServiceStatus{}},
+	})
+	// Wait for the socket to actually get free.
+	if err := waitForClosedPortTCP(p, svcInfo.proxyPort); err != nil {
+		t.Fatalf(err.Error())
+	}
+	svcInfo, exists := p.getServiceInfo(service)
+	if !exists {
+		t.Fatalf("can't find serviceInfo")
+	}
+	testEchoTCP(t, "127.0.0.1", svcInfo.proxyPort)
+	// This is a bit async, but this should be sufficient.
+	time.Sleep(500 * time.Millisecond)
+	waitForNumProxyLoops(t, p, 1)
+}
+
 func TestProxyUpdatePortal(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	service := types.NewNamespacedNameOrDie("testnamespace", "echo")
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
-			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: tcpServerPort}},
+			Subsets: []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
+				Ports:     []api.EndpointPort{{Port: tcpServerPort}},
+			}},
 		},
 	})
 

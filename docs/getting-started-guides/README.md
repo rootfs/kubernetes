@@ -1,6 +1,13 @@
+If you are not sure what OSes and infrastructure is supported, the table below lists all the combinations which have
+been tested recently.
+
+If you are considering contributing a new guide, please read the
+[guidelines](../../docs/devel/writing-a-getting-started-guide.md).
+
+
 IaaS Provider  | Config. Mgmt | OS     | Networking  | Docs                                                   | Support Level                | Notes
 -------------- | ------------ | ------ | ----------  | ----------------------------------------------------   | ---------------------------- | -----
-GCE            | Saltstack    | Debian | GCE         | [docs](../../docs/getting-started-guides/gce.md)       | Project                      | Tested with 0.9.2 by @satnam6502
+GCE            | Saltstack    | Debian | GCE         | [docs](../../docs/getting-started-guides/gce.md)       | Project                      | Tested with 0.13.2 by @brendandburns
 Vagrant        | Saltstack    | Fedora | OVS         | [docs](../../docs/getting-started-guides/vagrant.md)   | Project                      |
 Bare-metal     | custom       | Fedora | _none_      | [docs](../../docs/getting-started-guides/fedora/fedora_manual_config.md) | Project    | Uses K8s v0.13.2
 Bare-metal     | Ansible      | Fedora | flannel     | [docs](../../docs/getting-started-guides/fedora/fedora_ansible_config.md)       | Project    | Uses K8s v0.13.2
@@ -15,7 +22,7 @@ Vmware         | CoreOS       | CoreOS | flannel     | [docs](../../docs/getting
 Azure          | Saltstack    | Ubuntu | OpenVPN     | [docs](../../docs/getting-started-guides/azure.md)     | Community (@jeffmendoza)     |
 Bare-metal     | custom       | Ubuntu | _none_      | [docs](../../docs/getting-started-guides/ubuntu_single_node.md) | Community (@jainvipin)       |
 Bare-metal     | custom       | Ubuntu Cluster | flannel | [docs](../../docs/getting-started-guides/ubuntu_multinodes_cluster.md) | Community (@resouer @WIZARD-CXY) | use k8s version 0.12.0
-Local          |              |        | _none_      | [docs](../../docs/getting-started-guides/locally.md)   | Inactive                     |
+Local          |              |        | _none_      | [docs](../../docs/getting-started-guides/locally.md)   | Community (@preillyme)                     |
 Ovirt          |              |        |             | [docs](../../docs/getting-started-guides/ovirt.md)     | Inactive                     |
 Rackspace      | CoreOS       | CoreOS | Rackspace   | [docs](../../docs/getting-started-guides/rackspace.md) | Inactive                     |
 Bare-metal     | custom       | CentOS | _none_      | [docs](../../docs/getting-started-guides/centos/centos_manual_config.md) | Community(@coolsvap)    | Uses K8s v0.9.1
@@ -24,6 +31,7 @@ AWS            | Juju         | Ubuntu | flannel     | [docs](../../docs/getting
 OpenStack/HPCloud | Juju      | Ubuntu | flannel     | [docs](../../docs/getting-started-guides/juju.md)      | [Community](https://github.com/whitmo/bundle-kubernetes) ( [@whit](https://github.com/whitmo), [@matt](https://github.com/mbruzek), [@chuck](https://github.com/chuckbutler) ) | [Tested](http://reports.vapour.ws/charm-tests-by-charm/kubernetes) K8s v0.8.1
 Joyent         | Juju         | Ubuntu | flannel     | [docs](../../docs/getting-started-guides/juju.md)      | [Community](https://github.com/whitmo/bundle-kubernetes) ( [@whit](https://github.com/whitmo), [@matt](https://github.com/mbruzek), [@chuck](https://github.com/chuckbutler) ) | [Tested](http://reports.vapour.ws/charm-tests-by-charm/kubernetes) K8s v0.8.1
 Azure          | CoreOS       | CoreOS | Weave       | [docs](../../docs/getting-started-guides/coreos/azure/README.md)         | Community ([@errordeveloper](https://github.com/errordeveloper), [@squillace](https://github.com/squillace), [@chanezon]((https://github.com/chanezon)) | Uses K8s version 0.11.0
+Bare-metal (Offline) | CoreOS       | CoreOS | flannel      | [docs](../../docs/getting-started-guides/coreos/bare_metal_offline.md) | Community([@jeffbean](https://github.com/jeffbean))    | K8s v0.10.1
 
 Definition of columns:
   - **IaaS Provider** is who/what provides the virtual or physical machines (nodes) that Kubernetes runs on.

@@ -21,7 +21,10 @@
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/aws/${KUBE_CONFIG_FILE-"config-default.sh"}"
 
-export AWS_DEFAULT_REGION=${ZONE}
+# This removes the final character in bash (somehow)
+AWS_REGION=${ZONE%?}
+
+export AWS_DEFAULT_REGION=${AWS_REGION}
 AWS_CMD="aws --output json ec2"
 AWS_ELB_CMD="aws --output json elb"
 
@@ -105,7 +108,7 @@ function detect-image () {
   # See here: http://cloud-images.ubuntu.com/locator/ec2/ for other images
   # This will need to be updated from time to time as amis are deprecated
   if [[ -z "${AWS_IMAGE-}" ]]; then
-    case "${ZONE}" in
+    case "${AWS_REGION}" in
       ap-northeast-1)
         AWS_IMAGE=ami-93876e93
         ;;
@@ -236,9 +239,10 @@ function upload-server-tars() {
     aws s3 mb "s3://${AWS_S3_BUCKET}" --region ${AWS_S3_REGION}
   fi
 
-  local s3_url_base=https://s3-${AWS_S3_REGION}.amazonaws.com
-  if [[ "${AWS_S3_REGION}" == "us-east-1" ]]; then
-    # us-east-1 does not follow the pattern
+  local s3_bucket_location=$(aws --output text s3api get-bucket-location --bucket ${AWS_S3_BUCKET})
+  local s3_url_base=https://s3-${s3_bucket_location}.amazonaws.com
+  if [[ "${s3_bucket_location}" == "None" ]]; then
+    # "US Classic" does not follow the pattern
     s3_url_base=https://s3.amazonaws.com
   fi
 
@@ -330,6 +334,21 @@ function ensure-iam-profiles {
   }
 }
 
+# Wait for instance to be in running state
+function wait-for-instance-running {
+  instance_id=$1
+  while true; do
+    instance_state=$($AWS_CMD describe-instances --instance-ids $instance_id | expect_instance_states running)
+    if [[ "$instance_state" == "" ]]; then
+      break
+    else
+      echo "Waiting for instance ${instance_id} to spawn"
+      echo "Sleeping for 3 seconds..."
+      sleep 3
+    fi
+  done
+}
+
 function kube-up {
   find-release-tars
   upload-server-tars
@@ -413,7 +432,7 @@ function kube-up {
     echo "readonly NODE_INSTANCE_PREFIX='${INSTANCE_PREFIX}-minion'"
     echo "readonly SERVER_BINARY_TAR_URL='${SERVER_BINARY_TAR_URL}'"
     echo "readonly SALT_TAR_URL='${SALT_TAR_URL}'"
-    echo "readonly AWS_ZONE='${ZONE}'"
+    echo "readonly ZONE='${ZONE}'"
     echo "readonly MASTER_HTPASSWD='${htpasswd}'"
     echo "readonly PORTAL_NET='${PORTAL_NET}'"
     echo "readonly ENABLE_CLUSTER_MONITORING='${ENABLE_CLUSTER_MONITORING:-false}'"
@@ -467,9 +486,13 @@ function kube-up {
     else
       KUBE_MASTER=${MASTER_NAME}
       KUBE_MASTER_IP=${ip}
+      echo -e " ${color_green}[master running @${KUBE_MASTER_IP}]${color_norm}"
+
+      # We are not able to add a route to the instance until that instance is in "running" state.
+      wait-for-instance-running $master_id
+      sleep 10
       $AWS_CMD create-route --route-table-id $ROUTE_TABLE_ID --destination-cidr-block ${MASTER_IP_RANGE} --instance-id $master_id > $LOG
 
-      echo -e " ${color_green}[master running @${KUBE_MASTER_IP}]${color_norm}"
       break
     fi
     echo -e " ${color_yellow}[master not working yet]${color_norm}"
@@ -500,7 +523,7 @@ function kube-up {
     sleep 10
   done
 
-
+  MINION_IDS=()
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     echo "Starting Minion (${MINION_NAMES[$i]})"
     (
@@ -526,25 +549,20 @@ function kube-up {
     add-tag $minion_id Name ${MINION_NAMES[$i]}
     add-tag $minion_id Role $MINION_TAG
 
-    sleep 3
-    $AWS_CMD modify-instance-attribute --instance-id $minion_id --source-dest-check '{"Value": false}' > $LOG
+    MINION_IDS[$i]=$minion_id
+  done
 
+  # Add routes to minions
+  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     # We are not able to add a route to the instance until that instance is in "running" state.
     # This is quite an ugly solution to this problem. In Bash 4 we could use assoc. arrays to do this for
     # all instances at once but we can't be sure we are running Bash 4.
-    while true; do
-      instance_state=$($AWS_CMD describe-instances --instance-ids $minion_id | expect_instance_states running)
-      if [[ "$instance_state" == "" ]]; then
-        echo "Minion ${MINION_NAMES[$i]} running"
-        sleep 10
-        $AWS_CMD create-route --route-table-id $ROUTE_TABLE_ID --destination-cidr-block ${MINION_IP_RANGES[$i]} --instance-id $minion_id > $LOG
-        break
-      else
-        echo "Waiting for minion ${MINION_NAMES[$i]} to spawn"
-        echo "Sleeping for 3 seconds..."
-        sleep 3
-      fi
-    done
+    minion_id=${MINION_IDS[$i]}
+    wait-for-instance-running $minion_id
+    echo "Minion ${MINION_NAMES[$i]} running"
+    sleep 10
+    $AWS_CMD modify-instance-attribute --instance-id $minion_id --source-dest-check '{"Value": false}' > $LOG
+    $AWS_CMD create-route --route-table-id $ROUTE_TABLE_ID --destination-cidr-block ${MINION_IP_RANGES[$i]} --instance-id $minion_id > $LOG
   done
 
   FAIL=0
@@ -702,11 +720,28 @@ function kube-down {
   echo "Deleting VPC"
   vpc_id=$($AWS_CMD describe-vpcs | get_vpc_id)
   if [[ -n "${vpc_id}" ]]; then
-    elb_ids=$(get_elbs_in_vpc ${vpc_id})
-    for elb_id in ${elb_ids}; do
-      $AWS_ELB_CMD delete-load-balancer --load-balancer-name=${elb_id}
-    done
+    local elb_ids=$(get_elbs_in_vpc ${vpc_id})
+    if [[ -n ${elb_ids} ]]; then
+      echo "Deleting ELBs in: ${vpc_id}"
+      for elb_id in ${elb_ids}; do
+        $AWS_ELB_CMD delete-load-balancer --load-balancer-name=${elb_id}
+      done
 
+      echo "Waiting for ELBs to be deleted"
+      while true; do
+        elb_ids=$(get_elbs_in_vpc ${vpc_id})
+        if [[ -z "$elb_ids"  ]]; then
+          echo "All ELBs deleted"
+          break
+        else
+          echo "ELBs not yet deleted: $elb_ids"
+          echo "Sleeping for 3 seconds..."
+          sleep 3
+        fi
+      done
+    fi
+
+    echo "Deleting VPC: ${vpc_id}"
     default_sg_id=$($AWS_CMD --output text describe-security-groups \
                              --filters Name=vpc-id,Values=$vpc_id Name=group-name,Values=default \
                              --query SecurityGroups[].GroupId \

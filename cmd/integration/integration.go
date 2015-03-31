@@ -71,8 +71,8 @@ var (
 
 type fakeKubeletClient struct{}
 
-func (fakeKubeletClient) GetPodStatus(host, podNamespace, podID string) (api.PodStatusResult, error) {
-	glog.V(3).Infof("Trying to get container info for %v/%v/%v", host, podNamespace, podID)
+func (fakeKubeletClient) GetPodStatus(host, podNamespace, podName string) (api.PodStatusResult, error) {
+	glog.V(3).Infof("Trying to get container info for %v/%v/%v", host, podNamespace, podName)
 	// This is a horrible hack to get around the fact that we can't provide
 	// different port numbers per kubelet...
 	var c client.PodInfoGetter
@@ -88,19 +88,16 @@ func (fakeKubeletClient) GetPodStatus(host, podNamespace, podID string) (api.Pod
 			Port:   10251,
 		}
 	default:
-		glog.Fatalf("Can't get info for: '%v', '%v - %v'", host, podNamespace, podID)
+		glog.Fatalf("Can't get info for: '%v', '%v - %v'", host, podNamespace, podName)
 	}
-	r, err := c.GetPodStatus("127.0.0.1", podNamespace, podID)
+	r, err := c.GetPodStatus("127.0.0.1", podNamespace, podName)
 	if err != nil {
 		return r, err
 	}
 	r.Status.PodIP = "1.2.3.4"
-	m := make(api.PodInfo)
-	for k, v := range r.Status.Info {
-		v.Ready = true
-		m[k] = v
+	for i := range r.Status.ContainerStatuses {
+		r.Status.ContainerStatuses[i].Ready = true
 	}
-	r.Status.Info = m
 	return r, nil
 }
 
@@ -207,6 +204,9 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 	if err != nil {
 		glog.Fatalf("Couldn't create scheduler config: %v", err)
 	}
+	eventBroadcaster := record.NewBroadcaster()
+	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: "scheduler"})
+	eventBroadcaster.StartRecordingToSink(cl.Events(""))
 	scheduler.New(schedulerConfig).Run()
 
 	endpoints := service.NewEndpointController(cl)
@@ -224,8 +224,7 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 			api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 		}}
 
-	nodeController := nodeControllerPkg.NewNodeController(nil, "", machineList, nodeResources, cl, fakeKubeletClient{},
-		record.FromSource(api.EventSource{Component: "controllermanager"}), 10, 5*time.Minute)
+	nodeController := nodeControllerPkg.NewNodeController(nil, "", machineList, nodeResources, cl, fakeKubeletClient{}, 10, 5*time.Minute)
 	nodeController.Run(5*time.Second, true, false)
 	cadvisorInterface := new(cadvisor.Fake)
 
@@ -286,36 +285,50 @@ func endpointsSet(c *client.Client, serviceNamespace, serviceID string, endpoint
 			glog.Infof("Error on creating endpoints: %v", err)
 			return false, nil
 		}
-		for _, e := range endpoints.Endpoints {
-			glog.Infof("%s/%s endpoint: %s:%d %#v", serviceNamespace, serviceID, e.IP, e.Port, e.TargetRef)
+		count := 0
+		for _, ss := range endpoints.Subsets {
+			for _, addr := range ss.Addresses {
+				for _, port := range ss.Ports {
+					count++
+					glog.Infof("%s/%s endpoint: %s:%d %#v", serviceNamespace, serviceID, addr.IP, port.Port, addr.TargetRef)
+				}
+			}
 		}
-		return len(endpoints.Endpoints) == endpointCount, nil
+		return count == endpointCount, nil
 	}
 }
 
-func podExists(c *client.Client, podNamespace string, podID string) wait.ConditionFunc {
+func countEndpoints(eps *api.Endpoints) int {
+	count := 0
+	for i := range eps.Subsets {
+		count += len(eps.Subsets[i].Addresses) * len(eps.Subsets[i].Ports)
+	}
+	return count
+}
+
+func podExists(c *client.Client, podNamespace string, podName string) wait.ConditionFunc {
 	return func() (bool, error) {
-		_, err := c.Pods(podNamespace).Get(podID)
+		_, err := c.Pods(podNamespace).Get(podName)
 		return err == nil, nil
 	}
 }
 
-func podNotFound(c *client.Client, podNamespace string, podID string) wait.ConditionFunc {
+func podNotFound(c *client.Client, podNamespace string, podName string) wait.ConditionFunc {
 	return func() (bool, error) {
-		_, err := c.Pods(podNamespace).Get(podID)
+		_, err := c.Pods(podNamespace).Get(podName)
 		return apierrors.IsNotFound(err), nil
 	}
 }
 
-func podRunning(c *client.Client, podNamespace string, podID string) wait.ConditionFunc {
+func podRunning(c *client.Client, podNamespace string, podName string) wait.ConditionFunc {
 	return func() (bool, error) {
-		pod, err := c.Pods(podNamespace).Get(podID)
+		pod, err := c.Pods(podNamespace).Get(podName)
 		if apierrors.IsNotFound(err) {
 			return false, nil
 		}
 		if err != nil {
 			// This could be a connection error so we want to retry, but log the error.
-			glog.Errorf("Error when reading pod %q: %v", podID, err)
+			glog.Errorf("Error when reading pod %q: %v", podName, err)
 			return false, nil
 		}
 		if pod.Status.Phase != api.PodRunning {
@@ -672,7 +685,7 @@ func runMasterServiceTest(client *client.Client) {
 		if err != nil {
 			glog.Fatalf("unexpected error listing endpoints for kubernetes service: %v", err)
 		}
-		if len(ep.Endpoints) == 0 {
+		if countEndpoints(ep) == 0 {
 			glog.Fatalf("no endpoints for kubernetes service: %v", ep)
 		}
 	} else {
@@ -683,7 +696,7 @@ func runMasterServiceTest(client *client.Client) {
 		if err != nil {
 			glog.Fatalf("unexpected error listing endpoints for kubernetes service: %v", err)
 		}
-		if len(ep.Endpoints) == 0 {
+		if countEndpoints(ep) == 0 {
 			glog.Fatalf("no endpoints for kubernetes service: %v", ep)
 		}
 	} else {
@@ -803,6 +816,61 @@ func runServiceTest(client *client.Client) {
 	glog.Info("Service test passed.")
 }
 
+func runSchedulerNoPhantomPodsTest(client *client.Client) {
+	pod := &api.Pod{
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name:  "c1",
+					Image: "kubernetes/pause",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 1234, HostPort: 9999},
+					},
+					ImagePullPolicy: api.PullIfNotPresent,
+				},
+			},
+		},
+	}
+
+	// Assuming we only have two kublets, the third pod here won't schedule
+	// if the scheduler doesn't correctly handle the delete for the second
+	// pod.
+	pod.ObjectMeta.Name = "phantom.foo"
+	foo, err := client.Pods(api.NamespaceDefault).Create(pod)
+	if err != nil {
+		glog.Fatalf("Failed to create pod: %v, %v", pod, err)
+	}
+	if err := wait.Poll(time.Second, time.Second*10, podRunning(client, foo.Namespace, foo.Name)); err != nil {
+		glog.Fatalf("FAILED: pod never started running %v", err)
+	}
+
+	pod.ObjectMeta.Name = "phantom.bar"
+	bar, err := client.Pods(api.NamespaceDefault).Create(pod)
+	if err != nil {
+		glog.Fatalf("Failed to create pod: %v, %v", pod, err)
+	}
+	if err := wait.Poll(time.Second, time.Second*10, podRunning(client, bar.Namespace, bar.Name)); err != nil {
+		glog.Fatalf("FAILED: pod never started running %v", err)
+	}
+
+	// Delete a pod to free up room.
+	err = client.Pods(api.NamespaceDefault).Delete(bar.Name)
+	if err != nil {
+		glog.Fatalf("FAILED: couldn't delete pod %q: %v", bar.Name, err)
+	}
+
+	pod.ObjectMeta.Name = "phantom.baz"
+	baz, err := client.Pods(api.NamespaceDefault).Create(pod)
+	if err != nil {
+		glog.Fatalf("Failed to create pod: %v, %v", pod, err)
+	}
+	if err := wait.Poll(time.Second, time.Second*10, podRunning(client, baz.Namespace, baz.Name)); err != nil {
+		glog.Fatalf("FAILED: (Scheduler probably didn't process deletion of 'phantom.bar') Pod never started running: %v", err)
+	}
+
+	glog.Info("Scheduler doesn't make phantom pods: test passed.")
+}
+
 type testFunc func(*client.Client)
 
 func addFlags(fs *pflag.FlagSet) {
@@ -893,6 +961,11 @@ func main() {
 		glog.Fatalf("Expected 16 containers; got %v\n\nlist of created containers:\n\n%#v\n\nDocker 1 Created:\n\n%#v\n\nDocker 2 Created:\n\n%#v\n\n", len(createdConts), createdConts.List(), fakeDocker1.Created, fakeDocker2.Created)
 	}
 	glog.Infof("OK - found created containers: %#v", createdConts.List())
+
+	// This test doesn't run with the others because it can't run in
+	// parallel and also it schedules extra pods which would change the
+	// above pod counting logic.
+	runSchedulerNoPhantomPodsTest(kubeClient)
 }
 
 // ServeCachedManifestFile serves a file for kubelet to read.

@@ -18,6 +18,8 @@ package api
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -520,8 +522,10 @@ type Container struct {
 	Name string `json:"name"`
 	// Required.
 	Image string `json:"image"`
-	// Optional: Defaults to whatever is defined in the image.
+	// Optional: The docker image's entrypoint is used if this is not provided; cannot be updated.
 	Command []string `json:"command,omitempty"`
+	// Optional: The docker image's cmd is used if this is not provided; cannot be updated.
+	Args []string `json:"args,omitempty"`
 	// Optional: Defaults to Docker's default.
 	WorkingDir string          `json:"workingDir,omitempty"`
 	Ports      []ContainerPort `json:"ports,omitempty"`
@@ -610,6 +614,8 @@ type ContainerState struct {
 }
 
 type ContainerStatus struct {
+	// Each container in a pod must have a unique name.
+	Name string `name of the container; must be a DNS_LABEL and unique within the pod; cannot be updated"`
 	// TODO(dchen1107): Should we rename PodStatus to a more generic name or have a separate states
 	// defined for container?
 	State                ContainerState `json:"state,omitempty"`
@@ -663,15 +669,12 @@ type PodCondition struct {
 	Status ConditionStatus  `json:"status"`
 }
 
-// PodInfo contains one entry for every container with available info.
-type PodInfo map[string]ContainerStatus
-
 // PodContainerInfo is a wrapper for PodInfo that can be encode/decoded
 // DEPRECATED: Replaced with PodStatusResult
 type PodContainerInfo struct {
 	TypeMeta      `json:",inline"`
 	ObjectMeta    `json:"metadata,omitempty"`
-	ContainerInfo PodInfo `json:"containerInfo"`
+	ContainerInfo []ContainerStatus `json:"containerInfo"`
 }
 
 // RestartPolicy describes how the container should be restarted.
@@ -743,13 +746,12 @@ type PodStatus struct {
 	HostIP string `json:"hostIP,omitempty"`
 	PodIP  string `json:"podIP,omitempty"`
 
-	// The key of this map is the *name* of the container within the manifest; it has one
-	// entry per container in the manifest. The value of this map is currently the output
-	// of `docker inspect`. This output format is *not* final and should not be relied
-	// upon.
+	// The list has one entry per container in the manifest. Each entry is
+	// currently the output of `docker inspect`. This output format is *not*
+	// final and should not be relied upon.
 	// TODO: Make real decisions about what our info should look like. Re-enable fuzz test
 	// when we have done this.
-	Info PodInfo `json:"info,omitempty"`
+	ContainerStatuses []ContainerStatus `json:"containerStatuses,omitempty"`
 }
 
 // PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded
@@ -933,29 +935,62 @@ type Service struct {
 	Status ServiceStatus `json:"status,omitempty"`
 }
 
-// Endpoints is a collection of endpoints that implement the actual service, for example:
-// Name: "mysql", Endpoints: [{"ip": "10.10.1.1", "port": 1909}, {"ip": "10.10.2.2", "port": 8834}]
+// Endpoints is a collection of endpoints that implement the actual service.  Example:
+//   Name: "mysvc",
+//   Subsets: [
+//     {
+//       Addresses: [{"ip": "10.10.1.1"}, {"ip": "10.10.2.2"}],
+//       Ports: [{"name": "a", "port": 8675}, {"name": "b", "port": 309}]
+//     },
+//     {
+//       Addresses: [{"ip": "10.10.3.3"}],
+//       Ports: [{"name": "a", "port": 93}, {"name": "b", "port": 76}]
+//     },
+//  ]
 type Endpoints struct {
 	TypeMeta   `json:",inline"`
 	ObjectMeta `json:"metadata,omitempty"`
 
-	// Optional: The IP protocol for these endpoints. Supports "TCP" and
-	// "UDP".  Defaults to "TCP".
-	Protocol  Protocol   `json:"protocol,omitempty"`
-	Endpoints []Endpoint `json:"endpoints,omitempty"`
+	// The set of all endpoints is the union of all subsets.
+	Subsets []EndpointSubset
 }
 
-// Endpoint is a single IP endpoint of a service.
-type Endpoint struct {
-	// Required: The IP of this endpoint.
-	// TODO: This should allow hostname or IP, see #4447.
-	IP string `json:"ip"`
+// EndpointSubset is a group of addresses with a common set of ports.  The
+// expanded set of endpoints is the Cartesian product of Addresses x Ports.
+// For example, given:
+//   {
+//     Addresses: [{"ip": "10.10.1.1"}, {"ip": "10.10.2.2"}],
+//     Ports:     [{"name": "a", "port": 8675}, {"name": "b", "port": 309}]
+//   }
+// The resulting set of endpoints can be viewed as:
+//     a: [ 10.10.1.1:8675, 10.10.2.2:8675 ],
+//     b: [ 10.10.1.1:309, 10.10.2.2:309 ]
+type EndpointSubset struct {
+	Addresses []EndpointAddress
+	Ports     []EndpointPort
+}
 
-	// Required: The destination port to access.
-	Port int `json:"port"`
+// EndpointAddress is a tuple that describes single IP address.
+type EndpointAddress struct {
+	// The IP of this endpoint.
+	// TODO: This should allow hostname or IP, see #4447.
+	IP string
 
 	// Optional: The kubernetes object related to the entry point.
-	TargetRef *ObjectReference `json:"targetRef,omitempty"`
+	TargetRef *ObjectReference
+}
+
+// EndpointPort is a tuple that describes a single port.
+type EndpointPort struct {
+	// The name of this port (corresponds to ServicePort.Name).  Optional
+	// if only one port is defined.  Must be a DNS_LABEL.
+	Name string
+
+	// The port number.
+	Port int
+
+	// The IP protocol for this port.
+	Protocol Protocol
 }
 
 // EndpointsList is a list of endpoints.
@@ -968,9 +1003,6 @@ type EndpointsList struct {
 
 // NodeSpec describes the attributes that a node is created with.
 type NodeSpec struct {
-	// Capacity represents the available resources of a node.
-	Capacity ResourceList `json:"capacity,omitempty"`
-
 	// PodCIDR represents the pod IP range assigned to the node
 	// Note: assigning IP ranges to nodes might need to be revisited when we support migratable IPs.
 	PodCIDR string `json:"podCIDR,omitempty"`
@@ -990,10 +1022,22 @@ type NodeSystemInfo struct {
 	SystemUUID string `json:"systemUUID"`
 	// BootID is the boot-id reported by the node
 	BootID string `json:"bootID"`
+	// Kernel version reported by the node
+	KernelVersion string `json:"kernelVersion""`
+	// OS image used reported by the node
+	OsImage string `json:"osImage"`
+	// Container runtime version reported by the node
+	ContainerRuntimeVersion string `json:"containerRuntimeVersion"`
+	// Kubelet version reported by the node
+	KubeletVersion string `json:"kubeletVersion"`
+	// Kube-proxy version reported by the node
+	KubeProxyVersion string `json:"kubeProxyVersion"`
 }
 
 // NodeStatus is information about the current status of a node.
 type NodeStatus struct {
+	// Capacity represents the available resources of a node.
+	Capacity ResourceList `json:"capacity,omitempty"`
 	// NodePhase is the current lifecycle phase of the node.
 	Phase NodePhase `json:"phase,omitempty"`
 	// Conditions is an array of current node conditions.
@@ -1178,6 +1222,21 @@ type DeleteOptions struct {
 	GracePeriodSeconds *int64 `json:"gracePeriodSeconds"`
 }
 
+// ListOptions is the query options to a standard REST list call, and has future support for
+// watch calls.
+type ListOptions struct {
+	TypeMeta `json:",inline"`
+
+	// A selector based on labels
+	LabelSelector labels.Selector
+	// A selector based on fields
+	FieldSelector fields.Selector
+	// If true, watch for changes to this list
+	Watch bool
+	// The resource version to watch (no effect on list yet)
+	ResourceVersion string
+}
+
 // Status is a return value for calls that don't return other objects.
 // TODO: this could go in apiserver, but I'm including it here so clients needn't
 // import both.
@@ -1220,6 +1279,8 @@ type StatusDetails struct {
 	// The Causes array includes more details associated with the StatusReason
 	// failure. Not all StatusReasons may provide detailed causes.
 	Causes []StatusCause `json:"causes,omitempty"`
+	// If specified, the time in seconds before the operation should be retried.
+	RetryAfterSeconds int `json:"retryAfterSeconds,omitempty"`
 }
 
 // Values of Status.Status
@@ -1239,6 +1300,13 @@ const (
 	// The details field may contain other information about this error.
 	// Status code 500.
 	StatusReasonUnknown StatusReason = ""
+
+	// StatusReasonUnauthorized means the server can be reached and understood the request, but requires
+	// the user to present appropriate authorization credentials (identified by the WWW-Authenticate header)
+	// in order for the action to be completed. If the user has specified credentials on the request, the
+	// server considers them insufficient.
+	// Status code 401
+	StatusReasonUnauthorized StatusReason = "Unauthorized"
 
 	// StatusReasonForbidden means the server can be reached and understood the request, but refuses
 	// to take any further action.  It is the result of the server being configured to deny access for some reason
@@ -1296,12 +1364,17 @@ const (
 	// Details (optional):
 	//   "kind" string - the kind attribute of the resource being acted on.
 	//   "id"   string - the operation that is being attempted.
+	//   "retryAfterSeconds" int - the number of seconds before the operation should be retried
 	// Status code 500
 	StatusReasonServerTimeout StatusReason = "ServerTimeout"
 
 	// StatusReasonTimeout means that the request could not be completed within the given time.
-	// Clients can get this response only when they specified a timeout param in the request.
-	// The request might succeed with an increased value of timeout param.
+	// Clients can get this response only when they specified a timeout param in the request,
+	// or if the server cannot complete the operation within a reasonable amount of time.
+	// The request might succeed with an increased value of timeout param. The client *should*
+	// wait at least the number of seconds specified by the retryAfterSeconds field.
+	// Details (optional):
+	//   "retryAfterSeconds" int - the number of seconds before the operation should be retried
 	// Status code 504
 	StatusReasonTimeout StatusReason = "Timeout"
 
@@ -1453,7 +1526,8 @@ type ContainerManifest struct {
 	Containers    []Container   `json:"containers"`
 	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty"`
 	// Required: Set DNS policy.
-	DNSPolicy DNSPolicy `json:"dnsPolicy"`
+	DNSPolicy   DNSPolicy `json:"dnsPolicy"`
+	HostNetwork bool      `json:"hostNetwork,omitempty"`
 }
 
 // ContainerManifestList is used to communicate container manifests to kubelet.

@@ -73,30 +73,28 @@ for k,v in yaml.load(sys.stdin).iteritems():
     KUBERNETES_MASTER="true"
   fi
 
-  if [[ "${KUBERNETES_MASTER}" == "true" ]]; then
-    # TODO(zmerlynn): This block of code should disappear once #4561 & #4562 are done
-    if [[ -z "${KUBERNETES_NODE_NAMES:-}" ]]; then
-      until KUBERNETES_NODE_NAMES=$(curl-metadata kube-node-names); do
-        echo 'Waiting for metadata KUBERNETES_NODE_NAMES...'
-        sleep 3
-      done
-    fi
-  else
-    # And this should go away once the master can allocate CIDRs
-    if [[ -z "${MINION_IP_RANGE:-}" ]]; then
-      until MINION_IP_RANGE=$(curl-metadata node-ip-range); do
-        echo 'Waiting for metadata MINION_IP_RANGE...'
-        sleep 3
-      done
-    fi
+  if [[ "${KUBERNETES_MASTER}" != "true" ]] && [[ -z "${MINION_IP_RANGE:-}" ]]; then
+    # This block of code should go away once the master can allocate CIDRs
+    until MINION_IP_RANGE=$(curl-metadata node-ip-range); do
+      echo 'Waiting for metadata MINION_IP_RANGE...'
+      sleep 3
+    done
   fi
 }
 
 function remove-docker-artifacts() {
+  echo "== Deleting docker0 =="
+  # Forcibly install bridge-utils (options borrowed from Salt logs).
+  until apt-get -q -y -o DPkg::Options::=--force-confold -o DPkg::Options::=--force-confdef install bridge-utils; do
+    echo "== install of bridge-utils failed, retrying =="
+    sleep 5
+  done
+
   # Remove docker artifacts on minion nodes, if present
   iptables -t nat -F || true
   ifconfig docker0 down || true
   brctl delbr docker0 || true
+  echo "== Finished deleting docker0 =="
 }
 
 # Retry a download until we get it.
@@ -162,6 +160,9 @@ EOF
   done
 
   rm /usr/sbin/policy-rc.d
+
+  # Log a timestamp
+  echo "== Finished installing Salt =="
 }
 
 # Ensure salt-minion never runs
@@ -238,12 +239,6 @@ dns_server: '$(echo "$DNS_SERVER_IP" | sed -e "s/'/''/g")'
 dns_domain: '$(echo "$DNS_DOMAIN" | sed -e "s/'/''/g")'
 admission_control: '$(echo "$ADMISSION_CONTROL" | sed -e "s/'/''/g")'
 EOF
-
-  if [[ "${KUBERNETES_MASTER}" == "true" ]]; then
-    cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
-gce_node_names: '$(echo "$KUBERNETES_NODE_NAMES" | sed -e "s/'/''/g")'
-EOF
-  fi
 }
 
 # This should only happen on cluster initialization
@@ -266,7 +261,7 @@ function download-release() {
   echo "Downloading binary release tar ($SERVER_BINARY_TAR_URL)"
   download-or-bust "$SERVER_BINARY_TAR_URL"
 
-  echo "Downloading binary release tar ($SALT_TAR_URL)"
+  echo "Downloading Salt tar ($SALT_TAR_URL)"
   download-or-bust "$SALT_TAR_URL"
 
   echo "Unpacking Salt tree"
@@ -340,15 +335,15 @@ EOF
 }
 
 function salt-set-apiserver() {
-  local kube_master_ip
-  until kube_master_ip=$(getent hosts ${KUBERNETES_MASTER_NAME} | cut -f1 -d\ ); do
+  local kube_master_fqdn
+  until kube_master_fqdn=$(getent hosts ${KUBERNETES_MASTER_NAME} | awk '{ print $2 }'); do
     echo 'Waiting for DNS resolution of ${KUBERNETES_MASTER_NAME}...'
     sleep 3
   done
 
   cat <<EOF >>/etc/salt/minion.d/grains.conf
-  api_servers: '${kube_master_ip}'
-  apiservers: '${kube_master_ip}'
+  api_servers: '${kube_master_fqdn}'
+  apiservers: '${kube_master_fqdn}'
 EOF
 }
 
@@ -368,6 +363,7 @@ function configure-salt() {
 }
 
 function run-salt() {
+  echo "== Calling Salt =="
   salt-call --local state.highstate || true
 }
 

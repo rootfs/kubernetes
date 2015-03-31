@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/golang/glog"
 )
 
@@ -333,7 +334,7 @@ func describeService(service *api.Service, endpoints *api.Endpoints, events *api
 			fmt.Fprintf(out, "Public IPs:\t%s\n", list)
 		}
 		fmt.Fprintf(out, "Port:\t%d\n", service.Spec.Port)
-		fmt.Fprintf(out, "Endpoints:\t%s\n", formatEndpoints(endpoints.Endpoints))
+		fmt.Fprintf(out, "Endpoints:\t%s\n", formatEndpoints(endpoints))
 		fmt.Fprintf(out, "Session Affinity:\t%s\n", service.Spec.SessionAffinity)
 		if events != nil {
 			describeEvents(events, out)
@@ -366,7 +367,14 @@ func (d *NodeDescriber) Describe(namespace, name string) (string, error) {
 		pods = append(pods, pod)
 	}
 
-	events, _ := d.Events(namespace).Search(node)
+	var events *api.EventList
+	if ref, err := api.GetReference(node); err != nil {
+		glog.Errorf("Unable to construct reference to '%#v': %v", node, err)
+	} else {
+		// TODO: We haven't decided the namespace for Node object yet.
+		ref.UID = types.UID(ref.Name)
+		events, _ = d.Events("").Search(ref)
+	}
 
 	return describeNode(node, pods, events)
 }
@@ -393,12 +401,20 @@ func describeNode(node *api.Node, pods []api.Pod, events *api.EventList) (string
 			addresses = append(addresses, address.Address)
 		}
 		fmt.Fprintf(out, "Addresses:\t%s\n", strings.Join(addresses, ","))
-		if len(node.Spec.Capacity) > 0 {
+		if len(node.Status.Capacity) > 0 {
 			fmt.Fprintf(out, "Capacity:\n")
-			for resource, value := range node.Spec.Capacity {
+			for resource, value := range node.Status.Capacity {
 				fmt.Fprintf(out, " %s:\t%s\n", resource, value.String())
 			}
 		}
+
+		fmt.Fprintf(out, "Version:\n")
+		fmt.Fprintf(out, " Kernel Version:\t%s\n", node.Status.NodeInfo.KernelVersion)
+		fmt.Fprintf(out, " OS Image:\t%s\n", node.Status.NodeInfo.OsImage)
+		fmt.Fprintf(out, " Container Runtime Version:\t%s\n", node.Status.NodeInfo.ContainerRuntimeVersion)
+		fmt.Fprintf(out, " Kubelet Version:\t%s\n", node.Status.NodeInfo.KubeletVersion)
+		fmt.Fprintf(out, " Kube-Proxy Version:\t%s\n", node.Status.NodeInfo.KubeProxyVersion)
+
 		if len(node.Spec.PodCIDR) > 0 {
 			fmt.Fprintf(out, "PodCIDR:\t%s\n", node.Spec.PodCIDR)
 		}

@@ -27,6 +27,7 @@ import (
 	"path"
 	"reflect"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -46,6 +47,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/volume/host_path"
 	"github.com/fsouza/go-dockerclient"
@@ -100,7 +102,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.masterServiceNamespace = api.NamespaceDefault
 	kubelet.serviceLister = testServiceLister{}
 	kubelet.nodeLister = testNodeLister{}
-	kubelet.readiness = newReadinessStates()
+	kubelet.readinessManager = kubecontainer.NewReadinessManager()
 	kubelet.recorder = fakeRecorder
 	kubelet.statusManager = newStatusManager(fakeKubeClient)
 	if err := kubelet.setupDataDirs(); err != nil {
@@ -110,11 +112,20 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.cadvisor = mockCadvisor
 	podManager, fakeMirrorClient := newFakePodManager()
 	kubelet.podManager = podManager
+	kubelet.containerRefManager = kubecontainer.NewRefManager()
+	kubelet.containerRunner = &dockertools.DockerContainerRunner{fakeDocker, fakeRecorder}
 	return &TestKubelet{kubelet, fakeDocker, mockCadvisor, fakeKubeClient, waitGroup, fakeMirrorClient}
 }
 
 func verifyCalls(t *testing.T, fakeDocker *dockertools.FakeDockerClient, calls []string) {
 	err := fakeDocker.AssertCalls(calls)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func verifyUnorderedCalls(t *testing.T, fakeDocker *dockertools.FakeDockerClient, calls []string) {
+	err := fakeDocker.AssertUnorderedCalls(calls)
 	if err != nil {
 		t.Error(err)
 	}
@@ -135,23 +146,16 @@ func verifyStringArrayEquals(t *testing.T, actual, expected []string) {
 }
 
 func verifyStringArrayEqualsAnyOrder(t *testing.T, actual, expected []string) {
-	invalid := len(actual) != len(expected)
-	if !invalid {
-		for _, exp := range expected {
-			found := false
-			for _, act := range actual {
-				if exp == act {
-					found = true
-					break
-				}
-			}
-			if !found {
-				t.Errorf("Expected element %q not found in %#v", exp, actual)
-			}
-		}
-	}
-	if invalid {
-		t.Errorf("Expected: %#v, Actual: %#v", expected, actual)
+	act := make([]string, len(actual))
+	exp := make([]string, len(expected))
+	copy(act, actual)
+	copy(exp, expected)
+
+	sort.StringSlice(act).Sort()
+	sort.StringSlice(exp).Sort()
+
+	if !reflect.DeepEqual(exp, act) {
+		t.Errorf("Expected(sorted): %#v, Actual(sorted): %#v", exp, act)
 	}
 }
 
@@ -368,7 +372,7 @@ func TestKillContainerWithError(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	for _, c := range fakeDocker.ContainerList {
-		kubelet.readiness.set(c.ID, true)
+		kubelet.readinessManager.SetReadiness(c.ID, true)
 	}
 	kubelet.dockerClient = fakeDocker
 	c := apiContainerToContainer(fakeDocker.ContainerList[0])
@@ -379,11 +383,13 @@ func TestKillContainerWithError(t *testing.T) {
 	verifyCalls(t, fakeDocker, []string{"stop"})
 	killedContainer := containers[0]
 	liveContainer := containers[1]
-	if _, found := kubelet.readiness.states[killedContainer.ID]; found {
-		t.Errorf("exepcted container entry ID '%v' to not be found. states: %+v", killedContainer.ID, kubelet.readiness.states)
+	ready := kubelet.readinessManager.GetReadiness(killedContainer.ID)
+	if ready {
+		t.Errorf("exepcted container entry ID '%v' to not be found. states: %+v", killedContainer.ID, ready)
 	}
-	if _, found := kubelet.readiness.states[liveContainer.ID]; !found {
-		t.Errorf("exepcted container entry ID '%v' to be found. states: %+v", liveContainer.ID, kubelet.readiness.states)
+	ready = kubelet.readinessManager.GetReadiness(liveContainer.ID)
+	if !ready {
+		t.Errorf("exepcted container entry ID '%v' to be found. states: %+v", liveContainer.ID, ready)
 	}
 }
 
@@ -406,7 +412,7 @@ func TestKillContainer(t *testing.T) {
 		Name: "foobar",
 	}
 	for _, c := range fakeDocker.ContainerList {
-		kubelet.readiness.set(c.ID, true)
+		kubelet.readinessManager.SetReadiness(c.ID, true)
 	}
 
 	c := apiContainerToContainer(fakeDocker.ContainerList[0])
@@ -417,11 +423,13 @@ func TestKillContainer(t *testing.T) {
 	verifyCalls(t, fakeDocker, []string{"stop"})
 	killedContainer := containers[0]
 	liveContainer := containers[1]
-	if _, found := kubelet.readiness.states[killedContainer.ID]; found {
-		t.Errorf("exepcted container entry ID '%v' to not be found. states: %+v", killedContainer.ID, kubelet.readiness.states)
+	ready := kubelet.readinessManager.GetReadiness(killedContainer.ID)
+	if ready {
+		t.Errorf("exepcted container entry ID '%v' to not be found. states: %+v", killedContainer.ID, ready)
 	}
-	if _, found := kubelet.readiness.states[liveContainer.ID]; !found {
-		t.Errorf("exepcted container entry ID '%v' to be found. states: %+v", liveContainer.ID, kubelet.readiness.states)
+	ready = kubelet.readinessManager.GetReadiness(liveContainer.ID)
+	if !ready {
+		t.Errorf("exepcted container entry ID '%v' to be found. states: %+v", liveContainer.ID, ready)
 	}
 }
 
@@ -818,7 +826,7 @@ func TestSyncPodsDeletesWithNoPodInfraContainer(t *testing.T) {
 	}
 	waitGroup.Wait()
 
-	verifyCalls(t, fakeDocker, []string{
+	verifyUnorderedCalls(t, fakeDocker, []string{
 		"list", "list", "list", "list", "inspect_container", "inspect_container", "list", "inspect_container", "inspect_container", "stop", "create", "start", "inspect_container", "create", "start", "list", "inspect_container", "inspect_container"})
 
 	// A map iteration is used to delete containers, so must not depend on
@@ -1198,108 +1206,6 @@ func TestMakeVolumesAndBinds(t *testing.T) {
 		t.Errorf("Unexpected binds: Expected %#v got %#v.  Container was: %#v", expectedBinds, binds, container)
 	}
 	verifyStringArrayEquals(t, binds, expectedBinds)
-}
-
-func TestMakePortsAndBindings(t *testing.T) {
-	container := api.Container{
-		Ports: []api.ContainerPort{
-			{
-				ContainerPort: 80,
-				HostPort:      8080,
-				HostIP:        "127.0.0.1",
-			},
-			{
-				ContainerPort: 443,
-				HostPort:      443,
-				Protocol:      "tcp",
-			},
-			{
-				ContainerPort: 444,
-				HostPort:      444,
-				Protocol:      "udp",
-			},
-			{
-				ContainerPort: 445,
-				HostPort:      445,
-				Protocol:      "foobar",
-			},
-		},
-	}
-	exposedPorts, bindings := makePortsAndBindings(&container)
-	if len(container.Ports) != len(exposedPorts) ||
-		len(container.Ports) != len(bindings) {
-		t.Errorf("Unexpected ports and bindings, %#v %#v %#v", container, exposedPorts, bindings)
-	}
-	for key, value := range bindings {
-		switch value[0].HostPort {
-		case "8080":
-			if !reflect.DeepEqual(docker.Port("80/tcp"), key) {
-				t.Errorf("Unexpected docker port: %#v", key)
-			}
-			if value[0].HostIP != "127.0.0.1" {
-				t.Errorf("Unexpected host IP: %s", value[0].HostIP)
-			}
-		case "443":
-			if !reflect.DeepEqual(docker.Port("443/tcp"), key) {
-				t.Errorf("Unexpected docker port: %#v", key)
-			}
-			if value[0].HostIP != "" {
-				t.Errorf("Unexpected host IP: %s", value[0].HostIP)
-			}
-		case "444":
-			if !reflect.DeepEqual(docker.Port("444/udp"), key) {
-				t.Errorf("Unexpected docker port: %#v", key)
-			}
-			if value[0].HostIP != "" {
-				t.Errorf("Unexpected host IP: %s", value[0].HostIP)
-			}
-		case "445":
-			if !reflect.DeepEqual(docker.Port("445/tcp"), key) {
-				t.Errorf("Unexpected docker port: %#v", key)
-			}
-			if value[0].HostIP != "" {
-				t.Errorf("Unexpected host IP: %s", value[0].HostIP)
-			}
-		}
-	}
-}
-
-func TestFieldPath(t *testing.T) {
-	pod := &api.Pod{Spec: api.PodSpec{Containers: []api.Container{
-		{Name: "foo"},
-		{Name: "bar"},
-		{Name: ""},
-		{Name: "baz"},
-	}}}
-	table := map[string]struct {
-		pod       *api.Pod
-		container *api.Container
-		path      string
-		success   bool
-	}{
-		"basic":            {pod, &api.Container{Name: "foo"}, "spec.containers{foo}", true},
-		"basic2":           {pod, &api.Container{Name: "baz"}, "spec.containers{baz}", true},
-		"emptyName":        {pod, &api.Container{Name: ""}, "spec.containers[2]", true},
-		"basicSamePointer": {pod, &pod.Spec.Containers[0], "spec.containers{foo}", true},
-		"missing":          {pod, &api.Container{Name: "qux"}, "", false},
-	}
-
-	for name, item := range table {
-		res, err := fieldPath(item.pod, item.container)
-		if item.success == false {
-			if err == nil {
-				t.Errorf("%v: unexpected non-error", name)
-			}
-			continue
-		}
-		if err != nil {
-			t.Errorf("%v: unexpected error: %v", name, err)
-			continue
-		}
-		if e, a := item.path, res; e != a {
-			t.Errorf("%v: wanted %v, got %v", name, e, a)
-		}
-	}
 }
 
 type errorTestingDockerClient struct {
@@ -2182,6 +2088,43 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 	}
 }
 
+func runningState(cName string) api.ContainerStatus {
+	return api.ContainerStatus{
+		Name: cName,
+		State: api.ContainerState{
+			Running: &api.ContainerStateRunning{},
+		},
+	}
+}
+func stoppedState(cName string) api.ContainerStatus {
+	return api.ContainerStatus{
+		Name: cName,
+		State: api.ContainerState{
+			Termination: &api.ContainerStateTerminated{},
+		},
+	}
+}
+func succeededState(cName string) api.ContainerStatus {
+	return api.ContainerStatus{
+		Name: cName,
+		State: api.ContainerState{
+			Termination: &api.ContainerStateTerminated{
+				ExitCode: 0,
+			},
+		},
+	}
+}
+func failedState(cName string) api.ContainerStatus {
+	return api.ContainerStatus{
+		Name: cName,
+		State: api.ContainerState{
+			Termination: &api.ContainerStateTerminated{
+				ExitCode: -1,
+			},
+		},
+	}
+}
+
 func TestPodPhaseWithRestartAlways(t *testing.T) {
 	desiredState := api.PodSpec{
 		Containers: []api.Container{
@@ -2192,16 +2135,6 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 	}
 	currentState := api.PodStatus{
 		Host: "machine",
-	}
-	runningState := api.ContainerStatus{
-		State: api.ContainerState{
-			Running: &api.ContainerStateRunning{},
-		},
-	}
-	stoppedState := api.ContainerStatus{
-		State: api.ContainerState{
-			Termination: &api.ContainerStateTerminated{},
-		},
 	}
 
 	tests := []struct {
@@ -2214,9 +2147,9 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 			&api.Pod{
 				Spec: desiredState,
 				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": runningState,
-						"containerB": runningState,
+					ContainerStatuses: []api.ContainerStatus{
+						runningState("containerA"),
+						runningState("containerB"),
 					},
 					Host: "machine",
 				},
@@ -2228,9 +2161,9 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 			&api.Pod{
 				Spec: desiredState,
 				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": stoppedState,
-						"containerB": stoppedState,
+					ContainerStatuses: []api.ContainerStatus{
+						stoppedState("containerA"),
+						stoppedState("containerB"),
 					},
 					Host: "machine",
 				},
@@ -2242,9 +2175,9 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 			&api.Pod{
 				Spec: desiredState,
 				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": runningState,
-						"containerB": stoppedState,
+					ContainerStatuses: []api.ContainerStatus{
+						runningState("containerA"),
+						stoppedState("containerB"),
 					},
 					Host: "machine",
 				},
@@ -2256,8 +2189,8 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 			&api.Pod{
 				Spec: desiredState,
 				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": runningState,
+					ContainerStatuses: []api.ContainerStatus{
+						runningState("containerA"),
 					},
 					Host: "machine",
 				},
@@ -2267,7 +2200,7 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		if status := getPhase(&test.pod.Spec, test.pod.Status.Info); status != test.status {
+		if status := getPhase(&test.pod.Spec, test.pod.Status.ContainerStatuses); status != test.status {
 			t.Errorf("In test %s, expected %v, got %v", test.test, test.status, status)
 		}
 	}
@@ -2284,25 +2217,6 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 	currentState := api.PodStatus{
 		Host: "machine",
 	}
-	runningState := api.ContainerStatus{
-		State: api.ContainerState{
-			Running: &api.ContainerStateRunning{},
-		},
-	}
-	succeededState := api.ContainerStatus{
-		State: api.ContainerState{
-			Termination: &api.ContainerStateTerminated{
-				ExitCode: 0,
-			},
-		},
-	}
-	failedState := api.ContainerStatus{
-		State: api.ContainerState{
-			Termination: &api.ContainerStateTerminated{
-				ExitCode: -1,
-			},
-		},
-	}
 
 	tests := []struct {
 		pod    *api.Pod
@@ -2314,9 +2228,9 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 			&api.Pod{
 				Spec: desiredState,
 				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": runningState,
-						"containerB": runningState,
+					ContainerStatuses: []api.ContainerStatus{
+						runningState("containerA"),
+						runningState("containerB"),
 					},
 					Host: "machine",
 				},
@@ -2328,9 +2242,9 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 			&api.Pod{
 				Spec: desiredState,
 				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": succeededState,
-						"containerB": succeededState,
+					ContainerStatuses: []api.ContainerStatus{
+						succeededState("containerA"),
+						succeededState("containerB"),
 					},
 					Host: "machine",
 				},
@@ -2342,9 +2256,9 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 			&api.Pod{
 				Spec: desiredState,
 				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": failedState,
-						"containerB": failedState,
+					ContainerStatuses: []api.ContainerStatus{
+						failedState("containerA"),
+						failedState("containerB"),
 					},
 					Host: "machine",
 				},
@@ -2356,9 +2270,9 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 			&api.Pod{
 				Spec: desiredState,
 				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": runningState,
-						"containerB": succeededState,
+					ContainerStatuses: []api.ContainerStatus{
+						runningState("containerA"),
+						succeededState("containerB"),
 					},
 					Host: "machine",
 				},
@@ -2370,8 +2284,8 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 			&api.Pod{
 				Spec: desiredState,
 				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": runningState,
+					ContainerStatuses: []api.ContainerStatus{
+						runningState("containerA"),
 					},
 					Host: "machine",
 				},
@@ -2381,7 +2295,7 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		if status := getPhase(&test.pod.Spec, test.pod.Status.Info); status != test.status {
+		if status := getPhase(&test.pod.Spec, test.pod.Status.ContainerStatuses); status != test.status {
 			t.Errorf("In test %s, expected %v, got %v", test.test, test.status, status)
 		}
 	}
@@ -2398,25 +2312,6 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 	currentState := api.PodStatus{
 		Host: "machine",
 	}
-	runningState := api.ContainerStatus{
-		State: api.ContainerState{
-			Running: &api.ContainerStateRunning{},
-		},
-	}
-	succeededState := api.ContainerStatus{
-		State: api.ContainerState{
-			Termination: &api.ContainerStateTerminated{
-				ExitCode: 0,
-			},
-		},
-	}
-	failedState := api.ContainerStatus{
-		State: api.ContainerState{
-			Termination: &api.ContainerStateTerminated{
-				ExitCode: -1,
-			},
-		},
-	}
 
 	tests := []struct {
 		pod    *api.Pod
@@ -2428,9 +2323,9 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 			&api.Pod{
 				Spec: desiredState,
 				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": runningState,
-						"containerB": runningState,
+					ContainerStatuses: []api.ContainerStatus{
+						runningState("containerA"),
+						runningState("containerB"),
 					},
 					Host: "machine",
 				},
@@ -2442,9 +2337,9 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 			&api.Pod{
 				Spec: desiredState,
 				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": succeededState,
-						"containerB": succeededState,
+					ContainerStatuses: []api.ContainerStatus{
+						succeededState("containerA"),
+						succeededState("containerB"),
 					},
 					Host: "machine",
 				},
@@ -2456,9 +2351,9 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 			&api.Pod{
 				Spec: desiredState,
 				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": failedState,
-						"containerB": failedState,
+					ContainerStatuses: []api.ContainerStatus{
+						failedState("containerA"),
+						failedState("containerB"),
 					},
 					Host: "machine",
 				},
@@ -2470,9 +2365,9 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 			&api.Pod{
 				Spec: desiredState,
 				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": runningState,
-						"containerB": succeededState,
+					ContainerStatuses: []api.ContainerStatus{
+						runningState("containerA"),
+						succeededState("containerB"),
 					},
 					Host: "machine",
 				},
@@ -2484,8 +2379,8 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 			&api.Pod{
 				Spec: desiredState,
 				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": runningState,
+					ContainerStatuses: []api.ContainerStatus{
+						runningState("containerA"),
 					},
 					Host: "machine",
 				},
@@ -2495,9 +2390,22 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		if status := getPhase(&test.pod.Spec, test.pod.Status.Info); status != test.status {
+		if status := getPhase(&test.pod.Spec, test.pod.Status.ContainerStatuses); status != test.status {
 			t.Errorf("In test %s, expected %v, got %v", test.test, test.status, status)
 		}
+	}
+}
+
+func getReadyStatus(cName string) api.ContainerStatus {
+	return api.ContainerStatus{
+		Name:  cName,
+		Ready: true,
+	}
+}
+func getNotReadyStatus(cName string) api.ContainerStatus {
+	return api.ContainerStatus{
+		Name:  cName,
+		Ready: false,
 	}
 }
 
@@ -2512,7 +2420,7 @@ func TestGetPodReadyCondition(t *testing.T) {
 	}}
 	tests := []struct {
 		spec     *api.PodSpec
-		info     api.PodInfo
+		info     []api.ContainerStatus
 		expected []api.PodCondition
 	}{
 		{
@@ -2522,7 +2430,7 @@ func TestGetPodReadyCondition(t *testing.T) {
 		},
 		{
 			spec:     &api.PodSpec{},
-			info:     api.PodInfo{},
+			info:     []api.ContainerStatus{},
 			expected: ready,
 		},
 		{
@@ -2531,7 +2439,7 @@ func TestGetPodReadyCondition(t *testing.T) {
 					{Name: "1234"},
 				},
 			},
-			info:     api.PodInfo{},
+			info:     []api.ContainerStatus{},
 			expected: unready,
 		},
 		{
@@ -2540,8 +2448,8 @@ func TestGetPodReadyCondition(t *testing.T) {
 					{Name: "1234"},
 				},
 			},
-			info: api.PodInfo{
-				"1234": api.ContainerStatus{Ready: true},
+			info: []api.ContainerStatus{
+				getReadyStatus("1234"),
 			},
 			expected: ready,
 		},
@@ -2552,9 +2460,9 @@ func TestGetPodReadyCondition(t *testing.T) {
 					{Name: "5678"},
 				},
 			},
-			info: api.PodInfo{
-				"1234": api.ContainerStatus{Ready: true},
-				"5678": api.ContainerStatus{Ready: true},
+			info: []api.ContainerStatus{
+				getReadyStatus("1234"),
+				getReadyStatus("5678"),
 			},
 			expected: ready,
 		},
@@ -2565,8 +2473,8 @@ func TestGetPodReadyCondition(t *testing.T) {
 					{Name: "5678"},
 				},
 			},
-			info: api.PodInfo{
-				"1234": api.ContainerStatus{Ready: true},
+			info: []api.ContainerStatus{
+				getReadyStatus("1234"),
 			},
 			expected: unready,
 		},
@@ -2577,9 +2485,9 @@ func TestGetPodReadyCondition(t *testing.T) {
 					{Name: "5678"},
 				},
 			},
-			info: api.PodInfo{
-				"1234": api.ContainerStatus{Ready: true},
-				"5678": api.ContainerStatus{Ready: false},
+			info: []api.ContainerStatus{
+				getReadyStatus("1234"),
+				getNotReadyStatus("5678"),
 			},
 			expected: unready,
 		},
@@ -3084,26 +2992,47 @@ func TestValidateContainerStatus(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	containerName := "x"
 	testCases := []struct {
-		podInfo api.PodInfo
-		success bool
+		statuses []api.ContainerStatus
+		success  bool
 	}{
 		{
-			podInfo: api.PodInfo{containerName: api.ContainerStatus{State: api.ContainerState{Running: &api.ContainerStateRunning{}}}},
+			statuses: []api.ContainerStatus{
+				{
+					Name: containerName,
+					State: api.ContainerState{
+						Running: &api.ContainerStateRunning{},
+					},
+				},
+			},
 			success: true,
 		},
 		{
-			podInfo: api.PodInfo{containerName: api.ContainerStatus{State: api.ContainerState{Termination: &api.ContainerStateTerminated{}}}},
+			statuses: []api.ContainerStatus{
+				{
+					Name: containerName,
+					State: api.ContainerState{
+						Termination: &api.ContainerStateTerminated{},
+					},
+				},
+			},
 			success: true,
 		},
 		{
-			podInfo: api.PodInfo{containerName: api.ContainerStatus{State: api.ContainerState{Waiting: &api.ContainerStateWaiting{}}}},
+			statuses: []api.ContainerStatus{
+				{
+					Name: containerName,
+					State: api.ContainerState{
+						Waiting: &api.ContainerStateWaiting{},
+					},
+				},
+			},
 			success: false,
 		},
 	}
 
 	for i, tc := range testCases {
 		_, err := kubelet.validateContainerStatus(&api.PodStatus{
-			Info: tc.podInfo,
+			ContainerStatuses: tc.statuses,
 		}, containerName)
 		if tc.success {
 			if err != nil {
@@ -3114,7 +3043,7 @@ func TestValidateContainerStatus(t *testing.T) {
 		}
 	}
 	if _, err := kubelet.validateContainerStatus(&api.PodStatus{
-		Info: testCases[0].podInfo,
+		ContainerStatuses: testCases[0].statuses,
 	}, "blah"); err == nil {
 		t.Errorf("expected error with invalid container name")
 	}
@@ -3136,14 +3065,15 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 		MemoryCapacity: 1024,
 	}
 	mockCadvisor.On("MachineInfo").Return(machineInfo, nil)
+	versionInfo := &cadvisorApi.VersionInfo{
+		KernelVersion:      "3.16.0-0.bpo.4-amd64",
+		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
+		DockerVersion:      "1.5.0",
+	}
+	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
 	expectedNode := &api.Node{
 		ObjectMeta: api.ObjectMeta{Name: "testnode"},
-		Spec: api.NodeSpec{
-			Capacity: api.ResourceList{
-				api.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
-				api.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
-			},
-		},
+		Spec:       api.NodeSpec{},
 		Status: api.NodeStatus{
 			Conditions: []api.NodeCondition{
 				{
@@ -3155,9 +3085,18 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 				},
 			},
 			NodeInfo: api.NodeSystemInfo{
-				MachineID:  "123",
-				SystemUUID: "abc",
-				BootID:     "1b3",
+				MachineID:               "123",
+				SystemUUID:              "abc",
+				BootID:                  "1b3",
+				KernelVersion:           "3.16.0-0.bpo.4-amd64",
+				OsImage:                 "Debian GNU/Linux 7 (wheezy)",
+				ContainerRuntimeVersion: "docker://1.5.0",
+				KubeletVersion:          version.Get().String(),
+				KubeProxyVersion:        version.Get().String(),
+			},
+			Capacity: api.ResourceList{
+				api.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+				api.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
 			},
 		},
 	}
@@ -3193,12 +3132,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	kubeClient.MinionsList = api.NodeList{Items: []api.Node{
 		{
 			ObjectMeta: api.ObjectMeta{Name: "testnode"},
-			Spec: api.NodeSpec{
-				Capacity: api.ResourceList{
-					api.ResourceCPU:    *resource.NewMilliQuantity(3000, resource.DecimalSI),
-					api.ResourceMemory: *resource.NewQuantity(2048, resource.BinarySI),
-				},
-			},
+			Spec:       api.NodeSpec{},
 			Status: api.NodeStatus{
 				Conditions: []api.NodeCondition{
 					{
@@ -3208,6 +3142,10 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 						LastProbeTime:      util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 						LastTransitionTime: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					},
+				},
+				Capacity: api.ResourceList{
+					api.ResourceCPU:    *resource.NewMilliQuantity(3000, resource.DecimalSI),
+					api.ResourceMemory: *resource.NewQuantity(2048, resource.BinarySI),
 				},
 			},
 		},
@@ -3220,14 +3158,15 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 		MemoryCapacity: 1024,
 	}
 	mockCadvisor.On("MachineInfo").Return(machineInfo, nil)
+	versionInfo := &cadvisorApi.VersionInfo{
+		KernelVersion:      "3.16.0-0.bpo.4-amd64",
+		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
+		DockerVersion:      "1.5.0",
+	}
+	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
 	expectedNode := &api.Node{
 		ObjectMeta: api.ObjectMeta{Name: "testnode"},
-		Spec: api.NodeSpec{
-			Capacity: api.ResourceList{
-				api.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
-				api.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
-			},
-		},
+		Spec:       api.NodeSpec{},
 		Status: api.NodeStatus{
 			Conditions: []api.NodeCondition{
 				{
@@ -3239,9 +3178,18 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 				},
 			},
 			NodeInfo: api.NodeSystemInfo{
-				MachineID:  "123",
-				SystemUUID: "abc",
-				BootID:     "1b3",
+				MachineID:               "123",
+				SystemUUID:              "abc",
+				BootID:                  "1b3",
+				KernelVersion:           "3.16.0-0.bpo.4-amd64",
+				OsImage:                 "Debian GNU/Linux 7 (wheezy)",
+				ContainerRuntimeVersion: "docker://1.5.0",
+				KubeletVersion:          version.Get().String(),
+				KubeProxyVersion:        version.Get().String(),
+			},
+			Capacity: api.ResourceList{
+				api.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+				api.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
 			},
 		},
 	}

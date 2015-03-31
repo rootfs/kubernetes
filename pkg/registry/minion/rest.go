@@ -53,20 +53,27 @@ func (nodeStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
-// ResetBeforeCreate clears fields that are not allowed to be set by end users on creation.
-func (nodeStrategy) ResetBeforeCreate(obj runtime.Object) {
+// PrepareForCreate clears fields that are not allowed to be set by end users on creation.
+func (nodeStrategy) PrepareForCreate(obj runtime.Object) {
 	_ = obj.(*api.Node)
 	// Nodes allow *all* fields, including status, to be set.
 }
 
+// PrepareForUpdate clears fields that are not allowed to be set by end users on update.
+func (nodeStrategy) PrepareForUpdate(obj, old runtime.Object) {
+	_ = obj.(*api.Node)
+	_ = old.(*api.Node)
+	// Nodes allow *all* fields, including status, to be set.
+}
+
 // Validate validates a new node.
-func (nodeStrategy) Validate(obj runtime.Object) fielderrors.ValidationErrorList {
+func (nodeStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
 	node := obj.(*api.Node)
 	return validation.ValidateMinion(node)
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (nodeStrategy) ValidateUpdate(obj, old runtime.Object) fielderrors.ValidationErrorList {
+func (nodeStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
 	return validation.ValidateMinionUpdate(old.(*api.Node), obj.(*api.Node))
 }
 

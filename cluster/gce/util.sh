@@ -24,16 +24,32 @@ source "${KUBE_ROOT}/cluster/common.sh"
 
 NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-minion"
 
+KUBE_PROMPT_FOR_UPDATE=y
+
 # Verify prereqs
 function verify-prereqs {
   local cmd
   for cmd in gcloud gsutil; do
-    which "${cmd}" >/dev/null || {
-      echo "Can't find ${cmd} in PATH, please fix and retry. The Google Cloud "
-      echo "SDK can be downloaded from https://cloud.google.com/sdk/."
-      exit 1
-    }
+    if ! which "${cmd}" >/dev/null; then
+      echo "Can't find ${cmd} in PATH.  Do you wish to install the Google Cloud SDK? [Y/n]"
+      local resp
+      read resp
+      if [[ "${resp}" != "n" && "${resp}" != "N" ]]; then
+        curl https://sdk.cloud.google.com | bash
+      fi
+      if ! which "${cmd}" >/dev/null; then
+        echo "Can't find ${cmd} in PATH, please fix and retry. The Google Cloud "
+        echo "SDK can be downloaded from https://cloud.google.com/sdk/."
+        exit 1
+      fi
+    fi 
   done
+  # update and install components as needed
+  if [[ "${KUBE_PROMPT_FOR_UPDATE}" != "y" ]]; then
+    gcloud_prompt="-q"
+  fi
+  gcloud ${gcloud_prompt:-} components update preview || true
+  gcloud ${gcloud_prompt:-} components update || true
 }
 
 # Create a temp dir that'll be deleted at the end of this bash session.
@@ -429,7 +445,7 @@ function build-kube-env {
 
   rm -f ${file}
   cat >$file <<EOF
-ENV_TIMESTAMP: $(yaml-quote $(date -uIs))
+ENV_TIMESTAMP: $(yaml-quote $(date -u +%Y-%m-%dT%T%z))
 INSTANCE_PREFIX: $(yaml-quote ${INSTANCE_PREFIX})
 NODE_INSTANCE_PREFIX: $(yaml-quote ${NODE_INSTANCE_PREFIX})
 SERVER_BINARY_TAR_URL: $(yaml-quote ${SERVER_BINARY_TAR_URL})
@@ -584,18 +600,7 @@ function kube-up {
   # command returns, but currently it returns before the instances come up due
   # to gcloud's deficiency.
   wait-for-minions-to-run
-
-  # Give the master an initial node list (it's waiting in
-  # startup). This resolves a bit of a chicken-egg issue: The minions
-  # need to know the master's ip, so we boot the master first. The
-  # master still needs to know the initial minion list (until all the
-  # pieces #156 are complete), so we have it wait on the minion
-  # boot. (The minions further wait until the loop below, where CIDRs
-  # get filled in.)
   detect-minion-names
-  local kube_node_names
-  kube_node_names=$(IFS=,; echo "${MINION_NAMES[*]}")
-  add-instance-metadata "${MASTER_NAME}" "kube-node-names=${kube_node_names}"
 
   # Create the routes and set IP ranges to instance metadata, 5 instances at a time.
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do

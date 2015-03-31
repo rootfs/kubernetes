@@ -70,7 +70,8 @@ type tcpProxySocket struct {
 
 func tryConnect(service types.NamespacedName, srcAddr net.Addr, protocol string, proxier *Proxier) (out net.Conn, err error) {
 	for _, retryTimeout := range endpointDialTimeout {
-		endpoint, err := proxier.loadBalancer.NextEndpoint(service, srcAddr)
+		// TODO: support multiple service ports
+		endpoint, err := proxier.loadBalancer.NextEndpoint(service, "", srcAddr)
 		if err != nil {
 			glog.Errorf("Couldn't find an endpoint for %s: %v", service, err)
 			return nil, err
@@ -388,7 +389,8 @@ func (proxier *Proxier) ensurePortals() {
 func (proxier *Proxier) cleanupStaleStickySessions() {
 	for name, info := range proxier.serviceMap {
 		if info.sessionAffinityType != api.AffinityTypeNone {
-			proxier.loadBalancer.CleanupStaleStickySessions(name)
+			// TODO: support multiple service ports
+			proxier.loadBalancer.CleanupStaleStickySessions(name, "")
 		}
 	}
 }
@@ -477,10 +479,10 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 		info, exists := proxier.getServiceInfo(serviceName)
 		serviceIP := net.ParseIP(service.Spec.PortalIP)
 		// TODO: check health of the socket?  What if ProxyLoop exited?
-		if exists && info.portalPort == service.Spec.Port && info.portalIP.Equal(serviceIP) {
+		if exists && info.portalPort == service.Spec.Port && info.portalIP.Equal(serviceIP) && ipsEqual(service.Spec.PublicIPs, info.publicIP) {
 			continue
 		}
-		if exists && (info.portalPort != service.Spec.Port || !info.portalIP.Equal(serviceIP) || !ipsEqual(service.Spec.PublicIPs, info.publicIP)) {
+		if exists {
 			glog.V(4).Infof("Something changed for service %q: stopping it", serviceName.String())
 			err := proxier.closePortal(serviceName, info)
 			if err != nil {
@@ -509,7 +511,8 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 		if err != nil {
 			glog.Errorf("Failed to open portal for %q: %v", serviceName, err)
 		}
-		proxier.loadBalancer.NewService(serviceName, info.sessionAffinityType, info.stickyMaxAgeMinutes)
+		// TODO: support multiple service ports
+		proxier.loadBalancer.NewService(serviceName, "", info.sessionAffinityType, info.stickyMaxAgeMinutes)
 	}
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()

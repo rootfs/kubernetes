@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	newer "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	current "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -31,13 +32,18 @@ func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
 		t.Errorf("%v\n %#v", err, obj)
 		return nil
 	}
-	obj2 := reflect.New(reflect.TypeOf(obj).Elem()).Interface().(runtime.Object)
-	err = current.Codec.DecodeInto(data, obj2)
+	obj2, err := newer.Codec.Decode(data)
 	if err != nil {
 		t.Errorf("%v\nData: %s\nSource: %#v", err, string(data), obj)
 		return nil
 	}
-	return obj2
+	obj3 := reflect.New(reflect.TypeOf(obj).Elem()).Interface().(runtime.Object)
+	err = newer.Scheme.Convert(obj2, obj3)
+	if err != nil {
+		t.Errorf("%v\nSource: %#v", err, obj2)
+		return nil
+	}
+	return obj3
 }
 
 func TestSetDefaultService(t *testing.T) {
@@ -63,12 +69,24 @@ func TestSetDefaultSecret(t *testing.T) {
 }
 
 func TestSetDefaulEndpointsProtocol(t *testing.T) {
-	in := &current.Endpoints{}
+	in := &current.Endpoints{Subsets: []current.EndpointSubset{
+		{Ports: []current.EndpointPort{{}, {Protocol: "UDP"}, {}}},
+	}}
 	obj := roundTrip(t, runtime.Object(in))
 	out := obj.(*current.Endpoints)
 
-	if out.Protocol != current.ProtocolTCP {
-		t.Errorf("Expected protocol %s, got %s", current.ProtocolTCP, out.Protocol)
+	for i := range out.Subsets {
+		for j := range out.Subsets[i].Ports {
+			if in.Subsets[i].Ports[j].Protocol == "" {
+				if out.Subsets[i].Ports[j].Protocol != current.ProtocolTCP {
+					t.Errorf("Expected protocol %s, got %s", current.ProtocolTCP, out.Subsets[i].Ports[j].Protocol)
+				}
+			} else {
+				if out.Subsets[i].Ports[j].Protocol != in.Subsets[i].Ports[j].Protocol {
+					t.Errorf("Expected protocol %s, got %s", in.Subsets[i].Ports[j].Protocol, out.Subsets[i].Ports[j].Protocol)
+				}
+			}
+		}
 	}
 }
 

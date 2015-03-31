@@ -56,20 +56,20 @@ func TestValidateObjectMetaCustomName(t *testing.T) {
 
 func TestValidateObjectMetaUpdateIgnoresCreationTimestamp(t *testing.T) {
 	if errs := ValidateObjectMetaUpdate(
-		&api.ObjectMeta{Name: "test", CreationTimestamp: util.NewTime(time.Unix(10, 0))},
-		&api.ObjectMeta{Name: "test"},
+		&api.ObjectMeta{Name: "test", ResourceVersion: "1", CreationTimestamp: util.NewTime(time.Unix(10, 0))},
+		&api.ObjectMeta{Name: "test", ResourceVersion: "1"},
 	); len(errs) != 0 {
 		t.Fatalf("unexpected errors: %v", errs)
 	}
 	if errs := ValidateObjectMetaUpdate(
-		&api.ObjectMeta{Name: "test"},
-		&api.ObjectMeta{Name: "test", CreationTimestamp: util.NewTime(time.Unix(10, 0))},
+		&api.ObjectMeta{Name: "test", ResourceVersion: "1"},
+		&api.ObjectMeta{Name: "test", ResourceVersion: "1", CreationTimestamp: util.NewTime(time.Unix(10, 0))},
 	); len(errs) != 0 {
 		t.Fatalf("unexpected errors: %v", errs)
 	}
 	if errs := ValidateObjectMetaUpdate(
-		&api.ObjectMeta{Name: "test", CreationTimestamp: util.NewTime(time.Unix(11, 0))},
-		&api.ObjectMeta{Name: "test", CreationTimestamp: util.NewTime(time.Unix(10, 0))},
+		&api.ObjectMeta{Name: "test", ResourceVersion: "1", CreationTimestamp: util.NewTime(time.Unix(11, 0))},
+		&api.ObjectMeta{Name: "test", ResourceVersion: "1", CreationTimestamp: util.NewTime(time.Unix(10, 0))},
 	); len(errs) != 0 {
 		t.Fatalf("unexpected errors: %v", errs)
 	}
@@ -1213,6 +1213,8 @@ func TestValidatePodUpdate(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test.a.ObjectMeta.ResourceVersion = "1"
+		test.b.ObjectMeta.ResourceVersion = "1"
 		errs := ValidatePodUpdate(&test.a, &test.b)
 		if test.isValid {
 			if len(errs) != 0 {
@@ -1527,6 +1529,8 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 		},
 	}
 	for _, successCase := range successCases {
+		successCase.old.ObjectMeta.ResourceVersion = "1"
+		successCase.update.ObjectMeta.ResourceVersion = "1"
 		if errs := ValidateReplicationControllerUpdate(&successCase.old, &successCase.update); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
@@ -1827,14 +1831,14 @@ func TestValidateMinion(t *testing.T) {
 				Addresses: []api.NodeAddress{
 					{Type: api.NodeLegacyHostIP, Address: "something"},
 				},
-			},
-			Spec: api.NodeSpec{
-				ExternalID: "external",
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 					api.ResourceName("my.org/gpu"):       resource.MustParse("10"),
 				},
+			},
+			Spec: api.NodeSpec{
+				ExternalID: "external",
 			},
 		},
 		{
@@ -1845,13 +1849,13 @@ func TestValidateMinion(t *testing.T) {
 				Addresses: []api.NodeAddress{
 					{Type: api.NodeLegacyHostIP, Address: "something"},
 				},
-			},
-			Spec: api.NodeSpec{
-				ExternalID: "external",
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("0"),
 				},
+			},
+			Spec: api.NodeSpec{
+				ExternalID: "external",
 			},
 		},
 	}
@@ -1869,13 +1873,13 @@ func TestValidateMinion(t *testing.T) {
 			},
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{},
-			},
-			Spec: api.NodeSpec{
-				ExternalID: "external",
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 				},
+			},
+			Spec: api.NodeSpec{
+				ExternalID: "external",
 			},
 		},
 		"invalid-labels": {
@@ -1883,12 +1887,14 @@ func TestValidateMinion(t *testing.T) {
 				Name:   "abc-123",
 				Labels: invalidSelector,
 			},
-			Spec: api.NodeSpec{
-				ExternalID: "external",
+			Status: api.NodeStatus{
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 				},
+			},
+			Spec: api.NodeSpec{
+				ExternalID: "external",
 			},
 		},
 		"missing-external-id": {
@@ -1896,7 +1902,7 @@ func TestValidateMinion(t *testing.T) {
 				Name:   "abc-123",
 				Labels: validSelector,
 			},
-			Spec: api.NodeSpec{
+			Status: api.NodeStatus{
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
@@ -1917,11 +1923,13 @@ func TestValidateMinion(t *testing.T) {
 				Name:   "abc-123",
 				Labels: validSelector,
 			},
-			Spec: api.NodeSpec{
-				ExternalID: "external",
+			Status: api.NodeStatus{
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU): resource.MustParse("10"),
 				},
+			},
+			Spec: api.NodeSpec{
+				ExternalID: "external",
 			},
 		},
 		"missing-cpu": {
@@ -1929,11 +1937,13 @@ func TestValidateMinion(t *testing.T) {
 				Name:   "abc-123",
 				Labels: validSelector,
 			},
-			Spec: api.NodeSpec{
-				ExternalID: "external",
+			Status: api.NodeStatus{
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 				},
+			},
+			Spec: api.NodeSpec{
+				ExternalID: "external",
 			},
 		},
 		"invalid-memory": {
@@ -1941,12 +1951,14 @@ func TestValidateMinion(t *testing.T) {
 				Name:   "abc-123",
 				Labels: validSelector,
 			},
-			Spec: api.NodeSpec{
-				ExternalID: "external",
+			Status: api.NodeStatus{
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("-10G"),
 				},
+			},
+			Spec: api.NodeSpec{
+				ExternalID: "external",
 			},
 		},
 		"invalid-cpu": {
@@ -1954,12 +1966,14 @@ func TestValidateMinion(t *testing.T) {
 				Name:   "abc-123",
 				Labels: validSelector,
 			},
-			Spec: api.NodeSpec{
-				ExternalID: "external",
+			Status: api.NodeStatus{
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("-10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 				},
+			},
+			Spec: api.NodeSpec{
+				ExternalID: "external",
 			},
 		},
 	}
@@ -1971,14 +1985,14 @@ func TestValidateMinion(t *testing.T) {
 		for i := range errs {
 			field := errs[i].(*errors.ValidationError).Field
 			expectedFields := map[string]bool{
-				"metadata.name":         true,
-				"metadata.labels":       true,
-				"metadata.annotations":  true,
-				"metadata.namespace":    true,
-				"spec.Capacity":         true,
-				"spec.Capacity[memory]": true,
-				"spec.Capacity[cpu]":    true,
-				"spec.ExternalID":       true,
+				"metadata.name":           true,
+				"metadata.labels":         true,
+				"metadata.annotations":    true,
+				"metadata.namespace":      true,
+				"status.Capacity":         true,
+				"status.Capacity[memory]": true,
+				"status.Capacity[cpu]":    true,
+				"spec.ExternalID":         true,
 			}
 			if expectedFields[field] == false {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
@@ -2037,7 +2051,7 @@ func TestValidateMinionUpdate(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{
 				Name: "foo",
 			},
-			Spec: api.NodeSpec{
+			Status: api.NodeStatus{
 				Capacity: api.ResourceList{
 					api.ResourceCPU:    resource.MustParse("10000"),
 					api.ResourceMemory: resource.MustParse("100"),
@@ -2047,7 +2061,7 @@ func TestValidateMinionUpdate(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{
 				Name: "foo",
 			},
-			Spec: api.NodeSpec{
+			Status: api.NodeStatus{
 				Capacity: api.ResourceList{
 					api.ResourceCPU:    resource.MustParse("100"),
 					api.ResourceMemory: resource.MustParse("10000"),
@@ -2059,7 +2073,7 @@ func TestValidateMinionUpdate(t *testing.T) {
 				Name:   "foo",
 				Labels: map[string]string{"bar": "foo"},
 			},
-			Spec: api.NodeSpec{
+			Status: api.NodeStatus{
 				Capacity: api.ResourceList{
 					api.ResourceCPU:    resource.MustParse("10000"),
 					api.ResourceMemory: resource.MustParse("100"),
@@ -2070,7 +2084,7 @@ func TestValidateMinionUpdate(t *testing.T) {
 				Name:   "foo",
 				Labels: map[string]string{"bar": "fooobaz"},
 			},
-			Spec: api.NodeSpec{
+			Status: api.NodeStatus{
 				Capacity: api.ResourceList{
 					api.ResourceCPU:    resource.MustParse("100"),
 					api.ResourceMemory: resource.MustParse("10000"),
@@ -2121,6 +2135,8 @@ func TestValidateMinionUpdate(t *testing.T) {
 		}, true},
 	}
 	for i, test := range tests {
+		test.oldMinion.ObjectMeta.ResourceVersion = "1"
+		test.minion.ObjectMeta.ResourceVersion = "1"
 		errs := ValidateMinionUpdate(&test.oldMinion, &test.minion)
 		if test.valid && len(errs) > 0 {
 			t.Errorf("%d: Unexpected error: %v", i, errs)
@@ -2290,6 +2306,8 @@ func TestValidateServiceUpdate(t *testing.T) {
 			}, true},
 	}
 	for i, test := range tests {
+		test.oldService.ObjectMeta.ResourceVersion = "1"
+		test.service.ObjectMeta.ResourceVersion = "1"
 		errs := ValidateServiceUpdate(&test.oldService, &test.service)
 		if test.valid && len(errs) > 0 {
 			t.Errorf("%d: Unexpected error: %v", i, errs)
@@ -2555,6 +2573,8 @@ func TestValidateNamespaceFinalizeUpdate(t *testing.T) {
 			}, true},
 	}
 	for i, test := range tests {
+		test.namespace.ObjectMeta.ResourceVersion = "1"
+		test.oldNamespace.ObjectMeta.ResourceVersion = "1"
 		errs := ValidateNamespaceFinalizeUpdate(&test.namespace, &test.oldNamespace)
 		if test.valid && len(errs) > 0 {
 			t.Errorf("%d: Unexpected error: %v", i, errs)
@@ -2595,6 +2615,8 @@ func TestValidateNamespaceStatusUpdate(t *testing.T) {
 			}, false},
 	}
 	for i, test := range tests {
+		test.namespace.ObjectMeta.ResourceVersion = "1"
+		test.oldNamespace.ObjectMeta.ResourceVersion = "1"
 		errs := ValidateNamespaceStatusUpdate(&test.oldNamespace, &test.namespace)
 		if test.valid && len(errs) > 0 {
 			t.Errorf("%d: Unexpected error: %v", i, errs)
@@ -2665,6 +2687,8 @@ func TestValidateNamespaceUpdate(t *testing.T) {
 		}, true},
 	}
 	for i, test := range tests {
+		test.namespace.ObjectMeta.ResourceVersion = "1"
+		test.oldNamespace.ObjectMeta.ResourceVersion = "1"
 		errs := ValidateNamespaceUpdate(&test.oldNamespace, &test.namespace)
 		if test.valid && len(errs) > 0 {
 			t.Errorf("%d: Unexpected error: %v", i, errs)
@@ -2726,4 +2750,8 @@ func TestValidateSecret(t *testing.T) {
 			t.Errorf("%v: Unexpected non-error", name)
 		}
 	}
+}
+
+func TestValidateEndpoints(t *testing.T) {
+	// TODO: implement this
 }

@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
@@ -146,13 +147,14 @@ func (p fakeExecProber) Probe(_ exec.Cmd) (probe.Result, error) {
 
 func makeTestKubelet(result probe.Result, err error) *Kubelet {
 	return &Kubelet{
-		readiness: newReadinessStates(),
+		readinessManager: kubecontainer.NewReadinessManager(),
 		prober: probeHolder{
 			exec: fakeExecProber{
 				result: result,
 				err:    err,
 			},
 		},
+		containerRefManager: kubecontainer.NewRefManager(),
 	}
 }
 
@@ -410,8 +412,8 @@ func TestProbeContainer(t *testing.T) {
 		if test.expectedResult != result {
 			t.Errorf("Expected result was %v but probeContainer() returned %v", test.expectedResult, result)
 		}
-		if test.expectedReadiness != kl.readiness.get(dc.ID) {
-			t.Errorf("Expected readiness was %v but probeContainer() set %v", test.expectedReadiness, kl.readiness.get(dc.ID))
+		if test.expectedReadiness != kl.readinessManager.GetReadiness(dc.ID) {
+			t.Errorf("Expected readiness was %v but probeContainer() set %v", test.expectedReadiness, kl.readinessManager.GetReadiness(dc.ID))
 		}
 	}
 }

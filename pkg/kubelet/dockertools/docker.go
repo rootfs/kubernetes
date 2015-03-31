@@ -46,6 +46,13 @@ const (
 	DockerPrefix          = "docker://"
 )
 
+const (
+	// Taken from lmctfy https://github.com/google/lmctfy/blob/master/lmctfy/controllers/cpu_controller.cc
+	minShares     = 2
+	sharesPerCPU  = 1024
+	milliCPUToCPU = 1000
+)
+
 // DockerInterface is an abstract interface for testability.  It abstracts the interface of docker.Client.
 type DockerInterface interface {
 	ListContainers(options docker.ListContainersOptions) ([]docker.APIContainers, error)
@@ -558,6 +565,7 @@ func inspectContainer(client DockerInterface, dockerID, containerName, tPath str
 
 	glog.V(3).Infof("Container inspect result: %+v", *inspectResult)
 	result.status = api.ContainerStatus{
+		Name:        containerName,
 		Image:       inspectResult.Config.Image,
 		ImageID:     DockerPrefix + inspectResult.Image,
 		ContainerID: DockerPrefix + dockerID,
@@ -618,7 +626,7 @@ func inspectContainer(client DockerInterface, dockerID, containerName, tPath str
 // infrastructure container
 func GetDockerPodStatus(client DockerInterface, manifest api.PodSpec, podFullName string, uid types.UID) (*api.PodStatus, error) {
 	var podStatus api.PodStatus
-	podStatus.Info = api.PodInfo{}
+	statuses := make(map[string]api.ContainerStatus)
 
 	expectedContainers := make(map[string]api.Container)
 	for _, container := range manifest.Containers {
@@ -655,9 +663,9 @@ func GetDockerPodStatus(client DockerInterface, manifest api.PodSpec, podFullNam
 			terminationMessagePath = c.TerminationMessagePath
 		}
 		// We assume docker return us a list of containers in time order
-		if containerStatus, found := podStatus.Info[dockerContainerName]; found {
+		if containerStatus, found := statuses[dockerContainerName]; found {
 			containerStatus.RestartCount += 1
-			podStatus.Info[dockerContainerName] = containerStatus
+			statuses[dockerContainerName] = containerStatus
 			continue
 		}
 
@@ -665,25 +673,27 @@ func GetDockerPodStatus(client DockerInterface, manifest api.PodSpec, podFullNam
 		if result.err != nil {
 			return nil, err
 		}
+
 		// Add user container information
-		if dockerContainerName == PodInfraContainerName {
+		if dockerContainerName == PodInfraContainerName &&
+			result.status.State.Running != nil {
 			// Found network container
 			podStatus.PodIP = result.ip
 		} else {
-			podStatus.Info[dockerContainerName] = result.status
+			statuses[dockerContainerName] = result.status
 		}
 	}
 
-	if len(podStatus.Info) == 0 && podStatus.PodIP == "" {
+	if len(statuses) == 0 && podStatus.PodIP == "" {
 		return nil, ErrNoContainersInPod
 	}
 
 	// Not all containers expected are created, check if there are
 	// image related issues
-	if len(podStatus.Info) < len(manifest.Containers) {
+	if len(statuses) < len(manifest.Containers) {
 		var containerStatus api.ContainerStatus
 		for _, container := range manifest.Containers {
-			if _, found := podStatus.Info[container.Name]; found {
+			if _, found := statuses[container.Name]; found {
 				continue
 			}
 
@@ -705,8 +715,13 @@ func GetDockerPodStatus(client DockerInterface, manifest api.PodSpec, podFullNam
 				}
 			}
 
-			podStatus.Info[container.Name] = containerStatus
+			statuses[container.Name] = containerStatus
 		}
+	}
+
+	podStatus.ContainerStatuses = make([]api.ContainerStatus, 0)
+	for _, status := range statuses {
+		podStatus.ContainerStatuses = append(podStatus.ContainerStatuses, status)
 	}
 
 	return &podStatus, nil
@@ -865,4 +880,65 @@ func GetPods(client DockerInterface, all bool) ([]*kubecontainer.Pod, error) {
 		result = append(result, c)
 	}
 	return result, nil
+}
+
+func milliCPUToShares(milliCPU int64) int64 {
+	if milliCPU == 0 {
+		// zero milliCPU means unset. Use kernel default.
+		return 0
+	}
+	// Conceptually (milliCPU / milliCPUToCPU) * sharesPerCPU, but factored to improve rounding.
+	shares := (milliCPU * sharesPerCPU) / milliCPUToCPU
+	if shares < minShares {
+		return minShares
+	}
+	return shares
+}
+
+func makePortsAndBindings(container *api.Container) (map[docker.Port]struct{}, map[docker.Port][]docker.PortBinding) {
+	exposedPorts := map[docker.Port]struct{}{}
+	portBindings := map[docker.Port][]docker.PortBinding{}
+	for _, port := range container.Ports {
+		exteriorPort := port.HostPort
+		if exteriorPort == 0 {
+			// No need to do port binding when HostPort is not specified
+			continue
+		}
+		interiorPort := port.ContainerPort
+		// Some of this port stuff is under-documented voodoo.
+		// See http://stackoverflow.com/questions/20428302/binding-a-port-to-a-host-interface-using-the-rest-api
+		var protocol string
+		switch strings.ToUpper(string(port.Protocol)) {
+		case "UDP":
+			protocol = "/udp"
+		case "TCP":
+			protocol = "/tcp"
+		default:
+			glog.Warningf("Unknown protocol %q: defaulting to TCP", port.Protocol)
+			protocol = "/tcp"
+		}
+		dockerPort := docker.Port(strconv.Itoa(interiorPort) + protocol)
+		exposedPorts[dockerPort] = struct{}{}
+		portBindings[dockerPort] = []docker.PortBinding{
+			{
+				HostPort: strconv.Itoa(exteriorPort),
+				HostIP:   port.HostIP,
+			},
+		}
+	}
+	return exposedPorts, portBindings
+}
+
+func makeCapabilites(capAdd []api.CapabilityType, capDrop []api.CapabilityType) ([]string, []string) {
+	var (
+		addCaps  []string
+		dropCaps []string
+	)
+	for _, cap := range capAdd {
+		addCaps = append(addCaps, string(cap))
+	}
+	for _, cap := range capDrop {
+		dropCaps = append(dropCaps, string(cap))
+	}
+	return addCaps, dropCaps
 }

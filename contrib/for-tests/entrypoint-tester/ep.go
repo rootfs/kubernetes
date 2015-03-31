@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2015 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,11 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package resourcedefaults contains an example plug-in that
-// cluster operators can use to prevent unlimited CPU and
-// Memory usage for a container.  It intercepts all pod
-// create and update requests and applies a default
-// Memory and CPU quantity if none is supplied.
-// This plug-in can be enhanced in the future to make the default value
-// configurable via the admission control configuration file.
-package resourcedefaults
+package main
+
+import (
+	"fmt"
+	"os"
+)
+
+// This program prints the arguments it's passed and exits.
+func main() {
+	args := os.Args
+	fmt.Printf("%v\n", args)
+	os.Exit(0)
+}

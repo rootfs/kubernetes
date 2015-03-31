@@ -17,13 +17,14 @@ limitations under the License.
 package testing
 
 import (
-	"fmt"
 	"math/rand"
 	"strconv"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -87,6 +88,11 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 		func(j *api.ListMeta, c fuzz.Continue) {
 			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
 			j.SelfLink = c.RandString()
+		},
+		func(j *api.ListOptions, c fuzz.Continue) {
+			// TODO: add some parsing
+			j.LabelSelector, _ = labels.Parse("a=b")
+			j.FieldSelector, _ = fields.ParseSelector("a=b")
 		},
 		func(j *api.PodPhase, c fuzz.Continue) {
 			statuses := []api.PodPhase{api.PodPending, api.PodRunning, api.PodFailed, api.PodUnknown}
@@ -203,11 +209,6 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 		},
 		func(s *api.NamespaceStatus, c fuzz.Continue) {
 			s.Phase = api.NamespaceActive
-		},
-		func(ep *api.Endpoint, c fuzz.Continue) {
-			// TODO: If our API used a particular type for IP fields we could just catch that here.
-			ep.IP = fmt.Sprintf("%d.%d.%d.%d", c.Rand.Intn(256), c.Rand.Intn(256), c.Rand.Intn(256), c.Rand.Intn(256))
-			ep.Port = c.Rand.Intn(65536)
 		},
 		func(http *api.HTTPGetAction, c fuzz.Continue) {
 			c.FuzzNoCustom(http)        // fuzz self without calling this function again

@@ -247,7 +247,7 @@ func TestRegisterNodes(t *testing.T) {
 		for _, machine := range item.machines {
 			nodes.Items = append(nodes.Items, *newNode(machine))
 		}
-		nodeController := NewNodeController(nil, "", item.machines, &api.NodeResources{}, item.fakeNodeHandler, nil, nil, 10, time.Minute)
+		nodeController := NewNodeController(nil, "", item.machines, &api.NodeResources{}, item.fakeNodeHandler, nil, 10, time.Minute)
 		err := nodeController.RegisterNodes(&nodes, item.retryCount, time.Millisecond)
 		if !item.expectedFail && err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -281,12 +281,13 @@ func TestCreateGetStaticNodesWithSpec(t *testing.T) {
 						ObjectMeta: api.ObjectMeta{Name: "node0"},
 						Spec: api.NodeSpec{
 							ExternalID: "node0",
+						},
+						Status: api.NodeStatus{
 							Capacity: api.ResourceList{
 								api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 								api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 							},
 						},
-						Status: api.NodeStatus{},
 					},
 				},
 			},
@@ -299,23 +300,25 @@ func TestCreateGetStaticNodesWithSpec(t *testing.T) {
 						ObjectMeta: api.ObjectMeta{Name: "node0"},
 						Spec: api.NodeSpec{
 							ExternalID: "node0",
+						},
+						Status: api.NodeStatus{
 							Capacity: api.ResourceList{
 								api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 								api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 							},
 						},
-						Status: api.NodeStatus{},
 					},
 					{
 						ObjectMeta: api.ObjectMeta{Name: "node1"},
 						Spec: api.NodeSpec{
 							ExternalID: "node1",
+						},
+						Status: api.NodeStatus{
 							Capacity: api.ResourceList{
 								api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 								api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 							},
 						},
-						Status: api.NodeStatus{},
 					},
 				},
 			},
@@ -329,7 +332,7 @@ func TestCreateGetStaticNodesWithSpec(t *testing.T) {
 		},
 	}
 	for _, item := range table {
-		nodeController := NewNodeController(nil, "", item.machines, &resources, nil, nil, nil, 10, time.Minute)
+		nodeController := NewNodeController(nil, "", item.machines, &resources, nil, nil, 10, time.Minute)
 		nodes, err := nodeController.GetStaticNodesWithSpec()
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -364,7 +367,7 @@ func TestCreateGetCloudNodesWithSpec(t *testing.T) {
 				Items: []api.Node{
 					{
 						ObjectMeta: api.ObjectMeta{Name: "node0"},
-						Spec:       api.NodeSpec{Capacity: resourceList},
+						Status:     api.NodeStatus{Capacity: resourceList},
 					},
 				},
 			},
@@ -378,11 +381,11 @@ func TestCreateGetCloudNodesWithSpec(t *testing.T) {
 				Items: []api.Node{
 					{
 						ObjectMeta: api.ObjectMeta{Name: "node0"},
-						Spec:       api.NodeSpec{Capacity: resourceList},
+						Status:     api.NodeStatus{Capacity: resourceList},
 					},
 					{
 						ObjectMeta: api.ObjectMeta{Name: "node1"},
-						Spec:       api.NodeSpec{Capacity: resourceList},
+						Status:     api.NodeStatus{Capacity: resourceList},
 					},
 				},
 			},
@@ -390,7 +393,7 @@ func TestCreateGetCloudNodesWithSpec(t *testing.T) {
 	}
 
 	for _, item := range table {
-		nodeController := NewNodeController(item.fakeCloud, ".*", nil, &api.NodeResources{}, nil, nil, nil, 10, time.Minute)
+		nodeController := NewNodeController(item.fakeCloud, ".*", nil, &api.NodeResources{}, nil, nil, 10, time.Minute)
 		nodes, err := nodeController.GetCloudNodesWithSpec()
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -487,7 +490,7 @@ func TestSyncCloudNodes(t *testing.T) {
 	}
 
 	for _, item := range table {
-		nodeController := NewNodeController(item.fakeCloud, item.matchRE, nil, &api.NodeResources{}, item.fakeNodeHandler, nil, nil, 10, time.Minute)
+		nodeController := NewNodeController(item.fakeCloud, item.matchRE, nil, &api.NodeResources{}, item.fakeNodeHandler, nil, 10, time.Minute)
 		if err := nodeController.SyncCloudNodes(); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -569,7 +572,7 @@ func TestSyncCloudNodesEvictPods(t *testing.T) {
 	}
 
 	for _, item := range table {
-		nodeController := NewNodeController(item.fakeCloud, item.matchRE, nil, &api.NodeResources{}, item.fakeNodeHandler, nil, nil, 10, time.Minute)
+		nodeController := NewNodeController(item.fakeCloud, item.matchRE, nil, &api.NodeResources{}, item.fakeNodeHandler, nil, 10, time.Minute)
 		if err := nodeController.SyncCloudNodes(); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -671,7 +674,7 @@ func TestNodeConditionsCheck(t *testing.T) {
 	}
 
 	for _, item := range table {
-		nodeController := NewNodeController(nil, "", nil, nil, nil, item.fakeKubeletClient, nil, 10, time.Minute)
+		nodeController := NewNodeController(nil, "", nil, nil, nil, item.fakeKubeletClient, 10, time.Minute)
 		nodeController.now = func() util.Time { return fakeNow }
 		conditions := nodeController.DoCheck(item.node)
 		if !reflect.DeepEqual(item.expectedConditions, conditions) {
@@ -702,7 +705,7 @@ func TestPopulateNodeAddresses(t *testing.T) {
 	}
 
 	for _, item := range table {
-		nodeController := NewNodeController(item.fakeCloud, ".*", nil, nil, nil, nil, nil, 10, time.Minute)
+		nodeController := NewNodeController(item.fakeCloud, ".*", nil, nil, nil, nil, 10, time.Minute)
 		result, err := nodeController.PopulateAddresses(item.nodes)
 		// In case of IP querying error, we should continue.
 		if err != nil {
@@ -759,13 +762,13 @@ func TestSyncProbedNodeStatus(t *testing.T) {
 						Addresses: []api.NodeAddress{
 							{Type: api.NodeLegacyHostIP, Address: "1.2.3.4"},
 						},
-					},
-					Spec: api.NodeSpec{
-						ExternalID: "node0",
 						Capacity: api.ResourceList{
 							api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 							api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 						},
+					},
+					Spec: api.NodeSpec{
+						ExternalID: "node0",
 					},
 				},
 				{
@@ -790,13 +793,13 @@ func TestSyncProbedNodeStatus(t *testing.T) {
 						Addresses: []api.NodeAddress{
 							{Type: api.NodeLegacyHostIP, Address: "1.2.3.4"},
 						},
-					},
-					Spec: api.NodeSpec{
-						ExternalID: "node1",
 						Capacity: api.ResourceList{
 							api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 							api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 						},
+					},
+					Spec: api.NodeSpec{
+						ExternalID: "node1",
 					},
 				},
 			},
@@ -805,7 +808,7 @@ func TestSyncProbedNodeStatus(t *testing.T) {
 	}
 
 	for _, item := range table {
-		nodeController := NewNodeController(item.fakeCloud, ".*", nil, nil, item.fakeNodeHandler, item.fakeKubeletClient, nil, 10, time.Minute)
+		nodeController := NewNodeController(item.fakeCloud, ".*", nil, nil, item.fakeNodeHandler, item.fakeKubeletClient, 10, time.Minute)
 		nodeController.now = func() util.Time { return fakeNow }
 		if err := nodeController.SyncProbedNodeStatus(); err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -908,7 +911,7 @@ func TestSyncProbedNodeStatusTransitionTime(t *testing.T) {
 	}
 
 	for _, item := range table {
-		nodeController := NewNodeController(nil, "", []string{"node0"}, nil, item.fakeNodeHandler, item.fakeKubeletClient, nil, 10, time.Minute)
+		nodeController := NewNodeController(nil, "", []string{"node0"}, nil, item.fakeNodeHandler, item.fakeKubeletClient, 10, time.Minute)
 		nodeController.lookupIP = func(host string) ([]net.IP, error) { return nil, fmt.Errorf("lookup %v: no such host", host) }
 		nodeController.now = func() util.Time { return fakeNow }
 		if err := nodeController.SyncProbedNodeStatus(); err != nil {
@@ -1061,7 +1064,7 @@ func TestSyncProbedNodeStatusEvictPods(t *testing.T) {
 	}
 
 	for _, item := range table {
-		nodeController := NewNodeController(nil, "", []string{"node0"}, nil, item.fakeNodeHandler, item.fakeKubeletClient, nil, 10, 5*time.Minute)
+		nodeController := NewNodeController(nil, "", []string{"node0"}, nil, item.fakeNodeHandler, item.fakeKubeletClient, 10, 5*time.Minute)
 		nodeController.lookupIP = func(host string) ([]net.IP, error) { return nil, fmt.Errorf("lookup %v: no such host", host) }
 		if err := nodeController.SyncProbedNodeStatus(); err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -1219,7 +1222,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 	}
 
 	for _, item := range table {
-		nodeController := NewNodeController(nil, "", []string{"node0"}, nil, item.fakeNodeHandler, nil, nil, 10, item.evictionTimeout)
+		nodeController := NewNodeController(nil, "", []string{"node0"}, nil, item.fakeNodeHandler, nil, 10, item.evictionTimeout)
 		nodeController.now = func() util.Time { return fakeNow }
 		if err := nodeController.MonitorNodeStatus(); err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -1319,13 +1322,13 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 									LastTransitionTime: util.Date(2015, 1, 1, 11, 0, 0, 0, time.UTC),
 								},
 							},
-						},
-						Spec: api.NodeSpec{
-							ExternalID: "node0",
 							Capacity: api.ResourceList{
 								api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 								api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 							},
+						},
+						Spec: api.NodeSpec{
+							ExternalID: "node0",
 						},
 					},
 				},
@@ -1350,13 +1353,13 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 								LastTransitionTime: fakeNow,
 							},
 						},
-					},
-					Spec: api.NodeSpec{
-						ExternalID: "node0",
 						Capacity: api.ResourceList{
 							api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 							api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 						},
+					},
+					Spec: api.NodeSpec{
+						ExternalID: "node0",
 					},
 				},
 			},
@@ -1381,13 +1384,13 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 									LastTransitionTime: fakeNow,
 								},
 							},
-						},
-						Spec: api.NodeSpec{
-							ExternalID: "node0",
 							Capacity: api.ResourceList{
 								api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 								api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 							},
+						},
+						Spec: api.NodeSpec{
+							ExternalID: "node0",
 						},
 					},
 				},
@@ -1401,7 +1404,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 	}
 
 	for _, item := range table {
-		nodeController := NewNodeController(nil, "", []string{"node0"}, nil, item.fakeNodeHandler, nil, nil, 10, 5*time.Minute)
+		nodeController := NewNodeController(nil, "", []string{"node0"}, nil, item.fakeNodeHandler, nil, 10, 5*time.Minute)
 		nodeController.now = func() util.Time { return fakeNow }
 		if err := nodeController.MonitorNodeStatus(); err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -1420,6 +1423,8 @@ func newNode(name string) *api.Node {
 		ObjectMeta: api.ObjectMeta{Name: name},
 		Spec: api.NodeSpec{
 			ExternalID: name,
+		},
+		Status: api.NodeStatus{
 			Capacity: api.ResourceList{
 				api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 				api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),

@@ -43,8 +43,8 @@ func (namespaceStrategy) NamespaceScoped() bool {
 	return false
 }
 
-// ResetBeforeCreate clears fields that are not allowed to be set by end users on creation.
-func (namespaceStrategy) ResetBeforeCreate(obj runtime.Object) {
+// PrepareForCreate clears fields that are not allowed to be set by end users on creation.
+func (namespaceStrategy) PrepareForCreate(obj runtime.Object) {
 	// on create, status is active
 	namespace := obj.(*api.Namespace)
 	namespace.Status = api.NamespaceStatus{
@@ -68,8 +68,16 @@ func (namespaceStrategy) ResetBeforeCreate(obj runtime.Object) {
 	}
 }
 
+// PrepareForUpdate clears fields that are not allowed to be set by end users on update.
+func (namespaceStrategy) PrepareForUpdate(obj, old runtime.Object) {
+	newNamespace := obj.(*api.Namespace)
+	oldNamespace := old.(*api.Namespace)
+	newNamespace.Spec.Finalizers = oldNamespace.Spec.Finalizers
+	newNamespace.Status = oldNamespace.Status
+}
+
 // Validate validates a new namespace.
-func (namespaceStrategy) Validate(obj runtime.Object) fielderrors.ValidationErrorList {
+func (namespaceStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
 	namespace := obj.(*api.Namespace)
 	return validation.ValidateNamespace(namespace)
 }
@@ -80,7 +88,7 @@ func (namespaceStrategy) AllowCreateOnUpdate() bool {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (namespaceStrategy) ValidateUpdate(obj, old runtime.Object) fielderrors.ValidationErrorList {
+func (namespaceStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
 	return validation.ValidateNamespaceUpdate(obj.(*api.Namespace), old.(*api.Namespace))
 }
 
@@ -90,7 +98,13 @@ type namespaceStatusStrategy struct {
 
 var StatusStrategy = namespaceStatusStrategy{Strategy}
 
-func (namespaceStatusStrategy) ValidateUpdate(obj, old runtime.Object) fielderrors.ValidationErrorList {
+func (namespaceStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
+	newNamespace := obj.(*api.Namespace)
+	oldNamespace := old.(*api.Namespace)
+	newNamespace.Spec = oldNamespace.Spec
+}
+
+func (namespaceStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
 	return validation.ValidateNamespaceStatusUpdate(obj.(*api.Namespace), old.(*api.Namespace))
 }
 
@@ -100,7 +114,7 @@ type namespaceFinalizeStrategy struct {
 
 var FinalizeStrategy = namespaceFinalizeStrategy{Strategy}
 
-func (namespaceFinalizeStrategy) ValidateUpdate(obj, old runtime.Object) fielderrors.ValidationErrorList {
+func (namespaceFinalizeStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
 	return validation.ValidateNamespaceFinalizeUpdate(obj.(*api.Namespace), old.(*api.Namespace))
 }
 

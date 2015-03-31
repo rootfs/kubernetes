@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	endptspkg "github.com/GoogleCloudPlatform/kubernetes/pkg/api/endpoints"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -43,13 +44,21 @@ func (endpointsStrategy) NamespaceScoped() bool {
 	return true
 }
 
-// ResetBeforeCreate clears fields that are not allowed to be set by end users on creation.
-func (endpointsStrategy) ResetBeforeCreate(obj runtime.Object) {
-	_ = obj.(*api.Endpoints)
+// PrepareForCreate clears fields that are not allowed to be set by end users on creation.
+func (endpointsStrategy) PrepareForCreate(obj runtime.Object) {
+	endpoints := obj.(*api.Endpoints)
+	endpoints.Subsets = endptspkg.RepackSubsets(endpoints.Subsets)
+}
+
+// PrepareForUpdate clears fields that are not allowed to be set by end users on update.
+func (endpointsStrategy) PrepareForUpdate(obj, old runtime.Object) {
+	newEndpoints := obj.(*api.Endpoints)
+	_ = old.(*api.Endpoints)
+	newEndpoints.Subsets = endptspkg.RepackSubsets(newEndpoints.Subsets)
 }
 
 // Validate validates a new endpoints.
-func (endpointsStrategy) Validate(obj runtime.Object) fielderrors.ValidationErrorList {
+func (endpointsStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
 	return validation.ValidateEndpoints(obj.(*api.Endpoints))
 }
 
@@ -59,7 +68,7 @@ func (endpointsStrategy) AllowCreateOnUpdate() bool {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (endpointsStrategy) ValidateUpdate(obj, old runtime.Object) fielderrors.ValidationErrorList {
+func (endpointsStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
 	return validation.ValidateEndpointsUpdate(old.(*api.Endpoints), obj.(*api.Endpoints))
 }
 

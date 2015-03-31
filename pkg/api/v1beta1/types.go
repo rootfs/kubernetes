@@ -413,9 +413,11 @@ type Container struct {
 	Name string `json:"name" description:"name of the container; must be a DNS_LABEL and unique within the pod; cannot be updated"`
 	// Required.
 	Image string `json:"image" description:"Docker image name"`
-	// Optional: Defaults to whatever is defined in the image.
-	Command []string `json:"command,omitempty" description:"command argv array; not executed within a shell; defaults to entrypoint or command in the image; cannot be updated"`
-	// Optional: Defaults to Docker's default.
+	// Optional: The image's entrypoint is used if this is not provided; cannot be updated.
+	Entrypoint []string `json:"entrypoint:omitempty" description:"entrypoint array; not executed within a shell; the image's entrypoint is used if this is not provided; cannot be updated"`
+	// Optional: The image's cmd is used if this is not provided; cannot be updated.
+	Command []string `json:"command,omitempty" description:"command argv array; not executed within a shell; the image's cmd is used if this is not provided; cannot be updated"`
+	// Optional: Docker's default is used if this is not provided.
 	WorkingDir string               `json:"workingDir,omitempty" description:"container's working directory; defaults to image's default; cannot be updated"`
 	Ports      []ContainerPort      `json:"ports,omitempty" description:"list of ports to expose from the container; cannot be updated"`
 	Env        []EnvVar             `json:"env,omitempty" description:"list of environment variables to set in the container; cannot be updated"`
@@ -764,12 +766,61 @@ type EndpointObjectReference struct {
 // Name: "mysql", Endpoints: ["10.10.1.1:1909", "10.10.2.2:8834"]
 type Endpoints struct {
 	TypeMeta `json:",inline"`
-	// Optional: The IP protocol for these endpoints. Supports "TCP" and
-	// "UDP".  Defaults to "TCP".
-	Protocol  Protocol `json:"protocol,omitempty" description:"IP protocol for endpoint ports; must be UDP or TCP; TCP if unspecified"`
-	Endpoints []string `json:"endpoints" description:"list of endpoints corresponding to a service, of the form address:port, such as 10.10.1.1:1909"`
-	// Optional: The kubernetes object related to the entry point.
+
+	// These fields are retained for backwards compatibility.  For
+	// multi-port services, use the Subsets field instead.  Upon a create or
+	// update operation, the following logic applies:
+	//   * If Subsets is specified, Protocol, Endpoints, and TargetRefs will
+	//     be overwritten by data from Subsets.
+	//   * If Subsets is not specified, Protocol, Endpoints, and TargetRefs
+	//     will be used to generate Subsets.
+	Protocol  Protocol `json:"protocol,omitempty" description:"IP protocol for the first set of endpoint ports; must be UDP or TCP; TCP if unspecified"`
+	Endpoints []string `json:"endpoints" description:"first set of endpoints corresponding to a service, of the form address:port, such as 10.10.1.1:1909"`
+	// Optional: The kubernetes objects related to the first set of entry points.
 	TargetRefs []EndpointObjectReference `json:"targetRefs,omitempty" description:"list of references to objects providing the endpoints"`
+
+	// The set of all endpoints is the union of all subsets.  If this field
+	// is not empty it must include the backwards-compatible protocol and
+	// endpoints.
+	Subsets []EndpointSubset `json:"subsets" description:"sets of addresses and ports that comprise a service"`
+}
+
+// EndpointSubset is a group of addresses with a common set of ports.  The
+// expanded set of endpoints is the Cartesian product of Addresses x Ports.
+// For example, given:
+//   {
+//     Addresses: [{"ip": "10.10.1.1"}, {"ip": "10.10.2.2"}],
+//     Ports:     [{"name": "a", "port": 8675}, {"name": "b", "port": 309}]
+//   }
+// The resulting set of endpoints can be viewed as:
+//     a: [ 10.10.1.1:8675, 10.10.2.2:8675 ],
+//     b: [ 10.10.1.1:309, 10.10.2.2:309 ]
+type EndpointSubset struct {
+	Addresses []EndpointAddress `json:"addresses,omitempty" description:"IP addresses which offer the related ports"`
+	Ports     []EndpointPort    `json:"ports,omitempty" description:"port numbers available on the related IP addresses"`
+}
+
+// EndpointAddress is a tuple that describes single IP address.
+type EndpointAddress struct {
+	// The IP of this endpoint.
+	// TODO: This should allow hostname or IP, see #4447.
+	IP string `json:"IP" description:"IP address of the endpoint"`
+
+	// Optional: The kubernetes object related to the entry point.
+	TargetRef *ObjectReference `json:"targetRef,omitempty" description:"reference to object providing the endpoint"`
+}
+
+// EndpointPort is a tuple that describes a single port.
+type EndpointPort struct {
+	// The name of this port (corresponds to ServicePort.Name).  Optional
+	// if only one port is defined.  Must be a DNS_LABEL.
+	Name string `json:"name,omitempty" description:"name of this port"`
+
+	// The port number.
+	Port int `json:"port" description:"port number of the endpoint"`
+
+	// The IP protocol for this port.
+	Protocol Protocol `json:"protocol,omitempty" description:"protocol for this port; must be UDP or TCP; TCP if unspecified"`
 }
 
 // EndpointsList is a list of endpoints.
@@ -786,6 +837,16 @@ type NodeSystemInfo struct {
 	SystemUUID string `json:"systemUUID" description:"system uuid is the system-uuid reported by the node"`
 	// BootID is the boot-id reported by the node
 	BootID string `json:"bootID" description:"boot id is the boot-id reported by the node"`
+	// Kernel version reported by the node
+	KernelVersion string `json:"kernelVersion" description:"Kernel version reported by the node from 'uname -r' (e.g. 3.16.0-0.bpo.4-amd64)"`
+	// OS image used reported by the node
+	OsImage string `json:"osImage" description:"OS image used reported by the node from /etc/os-release (e.g. Debian GNU/Linux 7 (wheezy))"`
+	// Container runtime version reported by the node
+	ContainerRuntimeVersion string `json:"containerRuntimeVersion" description:"Container runtime version reported by the node through runtime remote API (e.g. docker://1.5.0)"`
+	// Kubelet version reported by the node
+	KubeletVersion string `json:"kubeletVersion" description:"Kubelet version reported by the node"`
+	// Kube-proxy version reported by the node
+	KubeProxyVersion string `json:"KubeProxyVersion" description:"Kube-proxy version reported by the node"`
 }
 
 // NodeStatus is information about the current status of a node.
@@ -977,6 +1038,20 @@ type DeleteOptions struct {
 	GracePeriodSeconds *int64 `json:"gracePeriodSeconds" description:"the duration in seconds to wait before deleting this object; defaults to a per object value if not specified; zero means delete immediately"`
 }
 
+// ListOptions is the query options to a standard REST list call
+type ListOptions struct {
+	TypeMeta `json:",inline"`
+
+	// A selector based on labels
+	LabelSelector string `json:"labels" description:"a selector to restrict the list of returned objects by their labels; defaults to everything"`
+	// A selector based on fields
+	FieldSelector string `json:"fields" description:"a selector to restrict the list of returned objects by their fields; defaults to everything"`
+	// If true, watch for changes to the selected resources
+	Watch bool `json:"watch" description:"watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion"`
+	// The desired resource version to watch
+	ResourceVersion string `json:"resourceVersion" description:"when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history"`
+}
+
 // Status is a return value for calls that don't return other objects.
 // TODO: this could go in apiserver, but I'm including it here so clients needn't
 // import both.
@@ -1016,6 +1091,8 @@ type StatusDetails struct {
 	// The Causes array includes more details associated with the StatusReason
 	// failure. Not all StatusReasons may provide detailed causes.
 	Causes []StatusCause `json:"causes,omitempty" description:"the Causes array includes more details associated with the StatusReason failure; not all StatusReasons may provide detailed causes"`
+	// If specified, the time in seconds before the operation should be retried.
+	RetryAfterSeconds int `json:"retryAfterSeconds,omitempty" description:"the number of seconds before the client should attempt to retry this operation"`
 }
 
 // Values of Status.Status
