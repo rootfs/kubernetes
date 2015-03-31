@@ -199,20 +199,20 @@ func (glusterfsVolume *glusterfs) execMount(hosts *api.Endpoints, path string, m
 		opt = []string{"-o", option}
 	}
 
-	l := len(hosts.Endpoints)
+	l := len(hosts.Subsets[0].Addresses)
 	// avoid mount storm, pick a host randomly
 	start := rand.Int() % l
 	// iterate all hosts until mount succeeds.
 	for i := start; i < start+l; i++ {
 		if helper == "" {
-			arg := []string{"-t", "glusterfs", hosts.Endpoints[i%l].IP + ":" + path, mountpoint}
+			arg := []string{"-t", "glusterfs", hosts.Subsets[0].Addresses[i%l].IP + ":" + path, mountpoint}
 			mountArgs = append(arg, opt...)
 			glog.Infof("Glusterfs: mount cmd: mount %v", strings.Join(mountArgs, " "))
 			command = glusterfsVolume.exe.Command("mount", mountArgs...)
 		} else {
 			// if helper is provided, make a cmd like "helper_cmd helper_arg mount -t glusterfs mnt -o option"
 			helper_array := strings.Split(helper, " ")
-			arg := []string{"mount", "-t", "glusterfs", hosts.Endpoints[i%l].IP + ":" + path, mountpoint}
+			arg := []string{"mount", "-t", "glusterfs", hosts.Subsets[0].Addresses[i%l].IP + ":" + path, mountpoint}
 			mountArgs = append(arg, opt...)
 			args := append(helper_array[1:], mountArgs...)
 			glog.Infof("Glusterfs: mount cmd: %s %v", helper_array[0], strings.Join(args, " "))

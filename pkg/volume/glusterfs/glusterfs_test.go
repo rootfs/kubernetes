@@ -77,7 +77,8 @@ func TestPlugin(t *testing.T) {
 		Name:         "vol1",
 		VolumeSource: api.VolumeSource{Glusterfs: &api.GlusterfsVolumeSource{"ep", "vol", "no-op", "echo"}},
 	}
-	ep := &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []api.Endpoint{{IP: "127.0.0.1"}}}
+	ep := &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Subsets: []api.EndpointSubset{{
+		Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}}}}}
 	builder, err := plug.(*glusterfsPlugin).newBuilderInternal(spec, ep, &api.ObjectReference{UID: types.UID("poduid")}, &mount.FakeMounter{}, exec.New())
 	volumePath := builder.GetPath()
 	if err != nil {
