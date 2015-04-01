@@ -209,6 +209,8 @@ type PersistentVolumeSource struct {
 	// This is useful for development and testing only.
 	// on-host storage is not supported in any way
 	HostPath *HostPathVolumeSource `json:"hostPath"`
+	// Glusterfs represents a Glusterfs volume that is attached to a host and exposed to the pod
+	Glusterfs *GlusterfsVolumeSource `json:"glusterfs"`
 }
 
 type PersistentVolume struct {
