@@ -75,7 +75,7 @@ func TestPlugin(t *testing.T) {
 	}
 	spec := &api.Volume{
 		Name:         "vol1",
-		VolumeSource: api.VolumeSource{Glusterfs: &api.GlusterfsVolumeSource{"ep", "vol", "no-op", "echo"}},
+		VolumeSource: api.VolumeSource{Glusterfs: &api.GlusterfsVolumeSource{"ep", "vol", false, "echo"}},
 	}
 	ep := &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Subsets: []api.EndpointSubset{{
 		Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}}}}}

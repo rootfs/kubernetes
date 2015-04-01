@@ -290,14 +290,15 @@ type GitRepoVolumeSource struct {
 
 // GlusterfsVolumeSource represents a Glusterfs Mount that lasts the lifetime of a pod
 type GlusterfsVolumeSource struct {
-	// Required: hosts is the endpoint name that details Glusterfs topology
-	Hosts string `json:"hosts" description:"gluster hosts endpoints name"`
+	// Required: EndpointsName is the endpoint name that details Glusterfs topology
+	EndpointsName string `json:"endpoints" description:"gluster hosts endpoints name"`
 
 	// Required: Path is the Glusterfs volume path
 	Path string `json:"path" description:"path to gluster volume"`
 
-	// Optional: mountOptions is the mount time options such as "rw" or "ro"
-	MountOpt string `json:"mountOptions,omitempty" description:"mount time options"`
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the Glusterfs volume to be mounted with read-only permissions
+	ReadOnly bool `json:"readOnly,omitempty" description:"glusterfs volume to be mounted with read-only permissions"`
 
 	// Optional: helper is the helper utility executed prior to mount command
 	Helper string `json:"helper,omitempty" description:"helper command executed prior to mount"`

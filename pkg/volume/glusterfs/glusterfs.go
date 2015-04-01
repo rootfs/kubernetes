@@ -69,7 +69,7 @@ func (plugin *glusterfsPlugin) GetAccessModes() []api.AccessModeType {
 }
 
 func (plugin *glusterfsPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference) (volume.Builder, error) {
-	ep_name := spec.VolumeSource.Glusterfs.Hosts
+	ep_name := spec.VolumeSource.Glusterfs.EndpointsName
 	ns := api.NamespaceDefault
 	ep, err := plugin.host.GetKubeClient().Endpoints(ns).Get(ep_name)
 	if err != nil {
@@ -82,15 +82,15 @@ func (plugin *glusterfsPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectRe
 
 func (plugin *glusterfsPlugin) newBuilderInternal(spec *api.Volume, ep *api.Endpoints, podRef *api.ObjectReference, mounter mount.Interface, exe exec.Interface) (volume.Builder, error) {
 	return &glusterfs{
-		volName: spec.Name,
-		hosts:   ep,
-		path:    spec.VolumeSource.Glusterfs.Path,
-		option:  spec.VolumeSource.Glusterfs.MountOpt,
-		helper:  spec.VolumeSource.Glusterfs.Helper,
-		mounter: mounter,
-		exe:     exe,
-		podRef:  podRef,
-		plugin:  plugin,
+		volName:  spec.Name,
+		hosts:    ep,
+		path:     spec.VolumeSource.Glusterfs.Path,
+		readonly: spec.VolumeSource.Glusterfs.ReadOnly,
+		helper:   spec.VolumeSource.Glusterfs.Helper,
+		mounter:  mounter,
+		exe:      exe,
+		podRef:   podRef,
+		plugin:   plugin,
 	}, nil
 }
 
@@ -109,15 +109,15 @@ func (plugin *glusterfsPlugin) newCleanerInternal(volName string, podUID types.U
 
 // Glusterfs volumes represent a bare host file or directory mount of an Glusterfs export.
 type glusterfs struct {
-	volName string
-	podRef  *api.ObjectReference
-	hosts   *api.Endpoints
-	path    string
-	option  string
-	helper  string
-	mounter mount.Interface
-	exe     exec.Interface
-	plugin  *glusterfsPlugin
+	volName  string
+	podRef   *api.ObjectReference
+	hosts    *api.Endpoints
+	path     string
+	readonly bool
+	helper   string
+	mounter  mount.Interface
+	exe      exec.Interface
+	plugin   *glusterfsPlugin
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
@@ -136,7 +136,7 @@ func (glusterfsVolume *glusterfs) SetUpAt(dir string) error {
 	}
 	path := glusterfsVolume.path
 	os.MkdirAll(dir, 0750)
-	err = glusterfsVolume.execMount(glusterfsVolume.hosts, path, dir, glusterfsVolume.option, glusterfsVolume.helper)
+	err = glusterfsVolume.execMount(glusterfsVolume.hosts, path, dir, glusterfsVolume.readonly, glusterfsVolume.helper)
 	if err == nil {
 		return nil
 	}
@@ -188,15 +188,17 @@ func (glusterfsVolume *glusterfs) cleanup(dir string) error {
 	return nil
 }
 
-func (glusterfsVolume *glusterfs) execMount(hosts *api.Endpoints, path string, mountpoint string, option string, helper string) error {
+func (glusterfsVolume *glusterfs) execMount(hosts *api.Endpoints, path string, mountpoint string, readonly bool, helper string) error {
 	var errs error
 	var command exec.Cmd
 	var mountArgs []string
 	var opt []string
 
 	// build option array
-	if option != "" {
-		opt = []string{"-o", option}
+	if readonly == true {
+		opt = []string{"-o", "ro"}
+	} else {
+		opt = []string{"-o", "rw"}
 	}
 
 	l := len(hosts.Subsets[0].Addresses)

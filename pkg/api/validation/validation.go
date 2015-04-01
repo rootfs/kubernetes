@@ -369,8 +369,8 @@ func validateNFS(nfs *api.NFSVolumeSource) errs.ValidationErrorList {
 
 func validateGlusterfs(glusterfs *api.GlusterfsVolumeSource) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	if glusterfs.Hosts == "" {
-		allErrs = append(allErrs, errs.NewFieldRequired("hosts"))
+	if glusterfs.EndpointsName == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("endpoints"))
 	}
 	if glusterfs.Path == "" {
 		allErrs = append(allErrs, errs.NewFieldRequired("path"))

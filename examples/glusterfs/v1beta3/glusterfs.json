@@ -22,9 +22,9 @@
             {
                 "name": "glusterfsvol",
                 "glusterfs": {
-                    "hosts": "glusterfs-cluster",
+                    "endpoints": "glusterfs-cluster",
                     "path": "kube_vol",
-                    "mountOptions": "",
+                    "readOnly": true,
                     "helper": ""
                 }
             }

@@ -404,14 +404,15 @@ type NFSVolumeSource struct {
 
 // GlusterfsVolumeSource represents a Glusterfs Mount that lasts the lifetime of a pod
 type GlusterfsVolumeSource struct {
-	// Required: hosts is the endpoint name that details Glusterfs topology
-	Hosts string `json:"hosts"`
+	// Required: EndpointsName is the endpoint name that details Glusterfs topology
+	EndpointsName string `json:"endpoints"`
 
 	// Required: Path is the Glusterfs volume path
 	Path string `json:"path"`
 
-	// Optional: mountOptions is the mount time options such as "rw" or "ro"
-	MountOpt string `json:"mountOptions,omitempty"`
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the Glusterfs to be mounted with read-only permissions
+	ReadOnly bool `json:"readOnly,omitempty"`
 
 	// Optional: helper is the helper utility executed prior to mount command
 	Helper string `json:"helper,omitempty"`
