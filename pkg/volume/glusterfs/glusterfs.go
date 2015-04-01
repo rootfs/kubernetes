@@ -76,7 +76,7 @@ func (plugin *glusterfsPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectRe
 		glog.Errorf("Glusterfs: failed to get endpoints %s[%v]", ep_name, err)
 		return nil, err
 	}
-	glog.Infof("Glusterfs: endpoints %v", ep)
+	glog.V(1).Infof("Glusterfs: endpoints %v", ep)
 	return plugin.newBuilderInternal(spec, ep, podRef, mount.New(), exec.New())
 }
 
@@ -201,23 +201,23 @@ func (glusterfsVolume *glusterfs) execMount(hosts *api.Endpoints, path string, m
 		opt = []string{"-o", "rw"}
 	}
 
-	l := len(hosts.Subsets[0].Addresses)
+	l := len(hosts.Subsets)
 	// avoid mount storm, pick a host randomly
 	start := rand.Int() % l
 	// iterate all hosts until mount succeeds.
 	for i := start; i < start+l; i++ {
 		if helper == "" {
-			arg := []string{"-t", "glusterfs", hosts.Subsets[0].Addresses[i%l].IP + ":" + path, mountpoint}
+			arg := []string{"-t", "glusterfs", hosts.Subsets[i%l].Addresses[0].IP + ":" + path, mountpoint}
 			mountArgs = append(arg, opt...)
-			glog.Infof("Glusterfs: mount cmd: mount %v", strings.Join(mountArgs, " "))
+			glog.V(1).Infof("Glusterfs: mount cmd: mount %v", strings.Join(mountArgs, " "))
 			command = glusterfsVolume.exe.Command("mount", mountArgs...)
 		} else {
 			// if helper is provided, make a cmd like "helper_cmd helper_arg mount -t glusterfs mnt -o option"
 			helper_array := strings.Split(helper, " ")
-			arg := []string{"mount", "-t", "glusterfs", hosts.Subsets[0].Addresses[i%l].IP + ":" + path, mountpoint}
+			arg := []string{"mount", "-t", "glusterfs", hosts.Subsets[i%l].Addresses[0].IP + ":" + path, mountpoint}
 			mountArgs = append(arg, opt...)
 			args := append(helper_array[1:], mountArgs...)
-			glog.Infof("Glusterfs: mount cmd: %s %v", helper_array[0], strings.Join(args, " "))
+			glog.V(1).Infof("Glusterfs: mount cmd: %s %v", helper_array[0], strings.Join(args, " "))
 			command = glusterfsVolume.exe.Command(helper_array[0], args...)
 		}
 

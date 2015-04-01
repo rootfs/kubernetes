@@ -1,12 +1,12 @@
 ## Glusterfs
 
-[Glusterfs](http://www.gluster.org) is an open source scale-out filesystem. These examples provide information about how to allow Docker containers use Glusterfs volumes.
+[Glusterfs](http://www.gluster.org) is an open source scale-out filesystem. These examples provide information about how to allow containers use Glusterfs volumes.
 
-The example consists of a pod that runs on hosts that install Glusterfs client package.
+The example assumes that the Glusterfs client package is installed on all nodes.
 
 ### Prerequisites
 
-Install Glusterfs client package on the hosts.
+Install Glusterfs client package on the Kubernetes hosts.
 
 ### Create a POD
 
@@ -24,12 +24,19 @@ The following *volume* spec illustrates a sample configuration.
 }
 ```
 
-The parameters are explained as the followings. **endpoints** is endpoint name that defines Gluster service. **kubelet** is optimized to avoid mount storm, it will randomly pick one from the hosts to mount. If this host is unresponsive, the next host in the array is automatically selected. **path** is the Glusterfs volume name. **readOnly** is the boolean that sets the mountpoint readOnly or readWrite. **helper** can be a command that can be executed prior to mounting the filesystem.
+The parameters are explained as the followings. 
+
+- **endpoints** is endpoints name that represents a Gluster cluster configuration. *kubelet* is optimized to avoid mount storm, it will randomly pick one from the endpoints to mount. If this host is unresponsive, the next Gluster host in the endpoints is automatically selected. 
+- **path** is the Glusterfs volume name. 
+- **readOnly** is the boolean that sets the mountpoint readOnly or readWrite. 
+- **helper** can be a command that can be executed prior to mounting the filesystem.
 
 Detailed POD and Gluster cluster endpoints examples can be found at [v1beta3/](v1beta3/) and [endpoints/](endpoints/)
 
 ```shell
+# create gluster cluster endpoints
 $ kubectl create -f examples/glusterfs/endpoints/glusterfs-endpoints.json
+# create a container using gluster volume
 $ kubectl create -f examples/glusterfs/v1beta3/glusterfs.json
 ```
 Once that's up you can list the pods and endpoint in the cluster, to verify that the master is running:
