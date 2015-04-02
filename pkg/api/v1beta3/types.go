@@ -354,9 +354,6 @@ type GlusterfsVolumeSource struct {
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the Glusterfs volume to be mounted with read-only permissions
 	ReadOnly bool `json:"readOnly,omitempty" description:"glusterfs volume to be mounted with read-only permissions"`
-
-	// Optional: helper is the helper utility executed prior to mount command
-	Helper string `json:"helper,omitempty" description:"helper command executed prior to mount"`
 }
 
 // StorageType defines ways that storage can be allocated to a volume.

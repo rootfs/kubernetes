@@ -24,8 +24,7 @@
                 "glusterfs": {
                     "endpoints": "glusterfs-cluster",
                     "path": "kube_vol",
-                    "readOnly": true,
-                    "helper": ""
+                    "readOnly": true
                 }
             }
         ]

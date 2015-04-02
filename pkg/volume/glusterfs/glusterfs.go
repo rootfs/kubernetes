@@ -86,7 +86,6 @@ func (plugin *glusterfsPlugin) newBuilderInternal(spec *api.Volume, ep *api.Endp
 		hosts:    ep,
 		path:     spec.VolumeSource.Glusterfs.Path,
 		readonly: spec.VolumeSource.Glusterfs.ReadOnly,
-		helper:   spec.VolumeSource.Glusterfs.Helper,
 		mounter:  mounter,
 		exe:      exe,
 		podRef:   podRef,
@@ -114,7 +113,6 @@ type glusterfs struct {
 	hosts    *api.Endpoints
 	path     string
 	readonly bool
-	helper   string
 	mounter  mount.Interface
 	exe      exec.Interface
 	plugin   *glusterfsPlugin
@@ -136,7 +134,7 @@ func (glusterfsVolume *glusterfs) SetUpAt(dir string) error {
 	}
 	path := glusterfsVolume.path
 	os.MkdirAll(dir, 0750)
-	err = glusterfsVolume.execMount(glusterfsVolume.hosts, path, dir, glusterfsVolume.readonly, glusterfsVolume.helper)
+	err = glusterfsVolume.execMount(glusterfsVolume.hosts, path, dir, glusterfsVolume.readonly)
 	if err == nil {
 		return nil
 	}
@@ -188,7 +186,7 @@ func (glusterfsVolume *glusterfs) cleanup(dir string) error {
 	return nil
 }
 
-func (glusterfsVolume *glusterfs) execMount(hosts *api.Endpoints, path string, mountpoint string, readonly bool, helper string) error {
+func (glusterfsVolume *glusterfs) execMount(hosts *api.Endpoints, path string, mountpoint string, readonly bool) error {
 	var errs error
 	var command exec.Cmd
 	var mountArgs []string
@@ -206,20 +204,10 @@ func (glusterfsVolume *glusterfs) execMount(hosts *api.Endpoints, path string, m
 	start := rand.Int() % l
 	// iterate all hosts until mount succeeds.
 	for i := start; i < start+l; i++ {
-		if helper == "" {
-			arg := []string{"-t", "glusterfs", hosts.Subsets[i%l].Addresses[0].IP + ":" + path, mountpoint}
-			mountArgs = append(arg, opt...)
-			glog.V(1).Infof("Glusterfs: mount cmd: mount %v", strings.Join(mountArgs, " "))
-			command = glusterfsVolume.exe.Command("mount", mountArgs...)
-		} else {
-			// if helper is provided, make a cmd like "helper_cmd helper_arg mount -t glusterfs mnt -o option"
-			helper_array := strings.Split(helper, " ")
-			arg := []string{"mount", "-t", "glusterfs", hosts.Subsets[i%l].Addresses[0].IP + ":" + path, mountpoint}
-			mountArgs = append(arg, opt...)
-			args := append(helper_array[1:], mountArgs...)
-			glog.V(1).Infof("Glusterfs: mount cmd: %s %v", helper_array[0], strings.Join(args, " "))
-			command = glusterfsVolume.exe.Command(helper_array[0], args...)
-		}
+		arg := []string{"-t", "glusterfs", hosts.Subsets[i%l].Addresses[0].IP + ":" + path, mountpoint}
+		mountArgs = append(arg, opt...)
+		glog.V(1).Infof("Glusterfs: mount cmd: mount %v", strings.Join(mountArgs, " "))
+		command = glusterfsVolume.exe.Command("mount", mountArgs...)
 
 		_, errs = command.CombinedOutput()
 		if errs == nil {

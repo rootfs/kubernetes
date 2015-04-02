@@ -29,7 +29,6 @@ The parameters are explained as the followings.
 - **endpoints** is endpoints name that represents a Gluster cluster configuration. *kubelet* is optimized to avoid mount storm, it will randomly pick one from the endpoints to mount. If this host is unresponsive, the next Gluster host in the endpoints is automatically selected. 
 - **path** is the Glusterfs volume name. 
 - **readOnly** is the boolean that sets the mountpoint readOnly or readWrite. 
-- **helper** can be a command that can be executed prior to mounting the filesystem.
 
 Detailed POD and Gluster cluster endpoints examples can be found at [v1beta3/](v1beta3/) and [endpoints/](endpoints/)
 

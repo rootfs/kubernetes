@@ -66,6 +66,7 @@ func contains(modes []api.AccessModeType, mode api.AccessModeType) bool {
 	}
 	return false
 }
+
 func TestPlugin(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
@@ -75,11 +76,25 @@ func TestPlugin(t *testing.T) {
 	}
 	spec := &api.Volume{
 		Name:         "vol1",
-		VolumeSource: api.VolumeSource{Glusterfs: &api.GlusterfsVolumeSource{"ep", "vol", false, "echo"}},
+		VolumeSource: api.VolumeSource{Glusterfs: &api.GlusterfsVolumeSource{"ep", "vol", false}},
 	}
 	ep := &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Subsets: []api.EndpointSubset{{
 		Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}}}}}
-	builder, err := plug.(*glusterfsPlugin).newBuilderInternal(spec, ep, &api.ObjectReference{UID: types.UID("poduid")}, &mount.FakeMounter{}, exec.New())
+	var fcmd exec.FakeCmd
+	fcmd = exec.FakeCmd{
+		CombinedOutputScript: []exec.FakeCombinedOutputAction{
+			// mount
+			func() ([]byte, error) {
+				return []byte{}, nil
+			},
+		},
+	}
+	fake := exec.FakeExec{
+		CommandScript: []exec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+		},
+	}
+	builder, err := plug.(*glusterfsPlugin).newBuilderInternal(spec, ep, &api.ObjectReference{UID: types.UID("poduid")}, &mount.FakeMounter{}, &fake)
 	volumePath := builder.GetPath()
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)

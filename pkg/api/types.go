@@ -413,9 +413,6 @@ type GlusterfsVolumeSource struct {
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the Glusterfs to be mounted with read-only permissions
 	ReadOnly bool `json:"readOnly,omitempty"`
-
-	// Optional: helper is the helper utility executed prior to mount command
-	Helper string `json:"helper,omitempty"`
 }
 
 // ContainerPort represents a network port in a single container
