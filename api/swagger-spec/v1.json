@@ -11641,6 +11641,10 @@
       "$ref": "v1.ISCSIVolumeSource",
       "description": "an iSCSI disk resource provisioned by an admin"
      },
+     "cephfs": {
+      "$ref": "v1.CephFSVolumeSource",
+      "description": "Ceph filesystem that will be mounted on the host machine"
+     },
      "accessModes": {
       "type": "array",
       "items": {
@@ -11853,6 +11857,37 @@
      }
     }
    },
+   "v1.CephFSVolumeSource": {
+    "id": "v1.CephFSVolumeSource",
+    "required": [
+     "monitors"
+    ],
+    "properties": {
+     "monitors": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "a collection of Ceph monitors"
+     },
+     "user": {
+      "type": "string",
+      "description": "rados user name; default is admin; optional"
+     },
+     "secretFile": {
+      "type": "string",
+      "description": "path to secret for rados user; default is /etc/ceph/user.secret; optional"
+     },
+     "secretRef": {
+      "$ref": "v1.LocalObjectReference",
+      "description": "name of a secret to authenticate the user; if provided overrides keyring; optional"
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "Ceph fs to be mounted with read-only permissions"
+     }
+    }
+   },
    "v1.PersistentVolumeStatus": {
     "id": "v1.PersistentVolumeStatus",
     "properties": {
@@ -12041,6 +12076,10 @@
      "rbd": {
       "$ref": "v1.RBDVolumeSource",
       "description": "rados block volume that will be mounted on the host machine; see http://releases.k8s.io/HEAD/examples/rbd/README.md"
+     },
+     "cephfs": {
+      "$ref": "v1.CephFSVolumeSource",
+      "description": "Ceph filesystem that will be mounted on the host machine"
      }
     }
    },

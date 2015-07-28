@@ -333,8 +333,7 @@ var _ = Describe("Volumes", func() {
 					volumeTestCleanup(c, config)
 				}
 			}()
-			pod := startVolumeServer(c, config)
-			serverIP := pod.Status.PodIP
+			serverIP := startVolumeServer(c, config)
 			Logf("Ceph server IP address: %v", serverIP)
 			By("sleeping a bit to give ceph server time to initialize")
 			time.Sleep(20 * time.Second)

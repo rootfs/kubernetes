@@ -96,16 +96,17 @@ func (plugin *cephfsPlugin) newBuilderInternal(spec *volume.Spec, podUID types.U
 		secret_file = "/etc/ceph/" + id + ".secret"
 	}
 
-	return &cephfs{
-		podUID:      podUID,
-		volName:     spec.Name,
-		mon:         cephvs.Monitors,
-		secret:      secret,
-		readonly:    cephvs.ReadOnly,
-		id:          id,
-		secret_file: secret_file,
-		mounter:     mounter,
-		plugin:      plugin,
+	return &cephfsBuilder{
+		cephfs: &cephfs{
+			podUID:      podUID,
+			volName:     spec.Name,
+			mon:         cephvs.Monitors,
+			secret:      secret,
+			id:          id,
+			secret_file: secret_file,
+			readonly:    cephvs.ReadOnly,
+			mounter:     mounter,
+			plugin:      plugin},
 	}, nil
 }
 
@@ -114,11 +115,12 @@ func (plugin *cephfsPlugin) NewCleaner(volName string, podUID types.UID, mounter
 }
 
 func (plugin *cephfsPlugin) newCleanerInternal(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
-	return &cephfs{
-		podUID:  podUID,
-		volName: volName,
-		mounter: mounter,
-		plugin:  plugin,
+	return &cephfsCleaner{
+		cephfs: &cephfs{
+			podUID:  podUID,
+			volName: volName,
+			mounter: mounter,
+			plugin:  plugin},
 	}, nil
 }
 
@@ -143,12 +145,18 @@ type cephfs struct {
 	plugin      *cephfsPlugin
 }
 
+type cephfsBuilder struct {
+	*cephfs
+}
+
+var _ volume.Builder = &cephfsBuilder{}
+
 // SetUp attaches the disk and bind mounts to the volume path.
-func (cephfsVolume *cephfs) SetUp() error {
+func (cephfsVolume *cephfsBuilder) SetUp() error {
 	return cephfsVolume.SetUpAt(cephfsVolume.GetPath())
 }
 
-func (cephfsVolume *cephfs) SetUpAt(dir string) error {
+func (cephfsVolume *cephfsBuilder) SetUpAt(dir string) error {
 	mountpoint, err := cephfsVolume.mounter.IsMountPoint(dir)
 	glog.V(4).Infof("CephFS: mount set up: %s %v %v", dir, mountpoint, err)
 	if err != nil && !os.IsNotExist(err) {
@@ -170,17 +178,23 @@ func (cephfsVolume *cephfs) SetUpAt(dir string) error {
 	return err
 }
 
-func (cephfsVolume *cephfs) GetPath() string {
-	name := cephfsPluginName
-	return cephfsVolume.plugin.host.GetPodVolumeDir(cephfsVolume.podUID, util.EscapeQualifiedNameForDisk(name), cephfsVolume.volName)
+type cephfsCleaner struct {
+	*cephfs
 }
 
-func (cephfsVolume *cephfs) TearDown() error {
+var _ volume.Cleaner = &cephfsCleaner{}
+
+func (cephfsVolume *cephfsCleaner) TearDown() error {
 	return cephfsVolume.TearDownAt(cephfsVolume.GetPath())
 }
 
-func (cephfsVolume *cephfs) TearDownAt(dir string) error {
+func (cephfsVolume *cephfsCleaner) TearDownAt(dir string) error {
 	return cephfsVolume.cleanup(dir)
+}
+
+func (cephfsVolume *cephfs) GetPath() string {
+	name := cephfsPluginName
+	return cephfsVolume.plugin.host.GetPodVolumeDir(cephfsVolume.podUID, util.EscapeQualifiedNameForDisk(name), cephfsVolume.volName)
 }
 
 func (cephfsVolume *cephfs) cleanup(dir string) error {

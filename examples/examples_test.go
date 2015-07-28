@@ -325,7 +325,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"zookeeper-service":       &api.Service{},
 			"zookeeper":               &api.Pod{},
 		},
-		"../examples/cephfs/v1beta3": {
+		"../examples/cephfs/": {
 			"cephfs":             &api.Pod{},
 			"cephfs-with-secret": &api.Pod{},
 		},

@@ -204,7 +204,6 @@ type VolumeSource struct {
 	RBD *RBDVolumeSource `json:"rbd,omitempty" description:"rados block volume that will be mounted on the host machine; see http://releases.k8s.io/HEAD/examples/rbd/README.md"`
 	// CephFS represents a Ceph FS mount on the host that shares a pod's lifetime
 	CephFS *CephFSVolumeSource `json:"cephfs,omitempty" description:"Ceph filesystem that will be mounted on the host machine"`
-
 }
 
 type PersistentVolumeClaimVolumeSource struct {
