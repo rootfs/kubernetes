@@ -55,6 +55,11 @@ func (vh *volumeHost) GetKubeClient() client.Interface {
 	return vh.kubelet.kubeClient
 }
 
+// Run a command in a container, returns the combined stdout, stderr as an array of bytes
+func (vh *volumeHost) RunInContainer(podFullName string, podUID types.UID, containerName string, cmd []string) ([]byte, error) {
+	return vh.kubelet.RunInContainer(podFullName, podUID, containerName, cmd)
+}
+
 func (vh *volumeHost) NewWrapperBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
 	b, err := vh.kubelet.newVolumeBuilderFromPlugins(spec, pod, opts, mounter)
 	if err == nil && b == nil {

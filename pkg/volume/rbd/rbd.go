@@ -21,6 +21,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
@@ -95,7 +96,7 @@ func (plugin *rbdPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.Vo
 
 	}
 	// Inject real implementations here, test through the internal function.
-	return plugin.newBuilderInternal(spec, pod.UID, &RBDUtil{}, mounter, secret)
+	return plugin.newBuilderInternal(pod, spec, pod.UID, &RBDUtil{}, mounter, secret)
 }
 
 func (plugin *rbdPlugin) getRBDVolumeSource(spec *volume.Spec) (*api.RBDVolumeSource, bool) {
@@ -108,7 +109,7 @@ func (plugin *rbdPlugin) getRBDVolumeSource(spec *volume.Spec) (*api.RBDVolumeSo
 	}
 }
 
-func (plugin *rbdPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface, secret string) (volume.Builder, error) {
+func (plugin *rbdPlugin) newBuilderInternal(pod *api.Pod, spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface, secret string) (volume.Builder, error) {
 	source, readOnly := plugin.getRBDVolumeSource(spec)
 	pool := source.RBDPool
 	if pool == "" {
@@ -122,17 +123,26 @@ func (plugin *rbdPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID,
 	if keyring == "" {
 		keyring = "/etc/ceph/keyring"
 	}
+	podName := kubecontainer.GetPodFullName(pod)
+	sidecarName := "sidecar" //hard-coded for now
+	if _, err := plugin.host.RunInContainer(podName, podUID, sidecarName, []string{"rbd", "-h"}); err != nil {
+		glog.V(1).Infof("no sidecar in pod %s: %v", podName, err)
+		podName = ""
+		sidecarName = ""
+	}
 
 	return &rbdBuilder{
 		rbd: &rbd{
-			podUID:   podUID,
-			volName:  spec.Name,
-			Image:    source.RBDImage,
-			Pool:     pool,
-			ReadOnly: readOnly,
-			manager:  manager,
-			mounter:  mounter,
-			plugin:   plugin,
+			podUID:               podUID,
+			volName:              spec.Name,
+			Image:                source.RBDImage,
+			Pool:                 pool,
+			ReadOnly:             readOnly,
+			manager:              manager,
+			mounter:              mounter,
+			plugin:               plugin,
+			podFullName:          podName,
+			sideCarContainerName: sidecarName,
 		},
 		Mon:     source.CephMonitors,
 		Id:      id,
@@ -172,6 +182,9 @@ type rbd struct {
 	mounter  mount.Interface
 	// Utility interface that provides API calls to the provider to attach/detach disks.
 	manager diskManager
+	// sidecar
+	podFullName          string
+	sideCarContainerName string
 }
 
 func (rbd *rbd) GetPath() string {

@@ -56,6 +56,10 @@ func (f *fakeVolumeHost) GetKubeClient() client.Interface {
 	return f.kubeClient
 }
 
+func (vh *fakeVolumeHost) RunInContainer(podFullName string, podUID types.UID, containerName string, cmd []string) ([]byte, error) {
+	return nil, nil
+}
+
 func (f *fakeVolumeHost) NewWrapperBuilder(spec *Spec, pod *api.Pod, opts VolumeOptions, mounter mount.Interface) (Builder, error) {
 	plug, err := f.pluginMgr.FindPluginBySpec(spec)
 	if err != nil {

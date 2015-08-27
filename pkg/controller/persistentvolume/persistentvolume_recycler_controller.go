@@ -222,6 +222,10 @@ func (f *PersistentVolumeRecycler) GetKubeClient() client.Interface {
 	return f.kubeClient
 }
 
+func (f *PersistentVolumeRecycler) RunInContainer(podFullName string, podUID types.UID, containerName string, cmd []string) ([]byte, error) {
+	return nil, nil
+}
+
 func (f *PersistentVolumeRecycler) NewWrapperBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
 	return nil, fmt.Errorf("NewWrapperBuilder not supported by PVClaimBinder's VolumeHost implementation")
 }

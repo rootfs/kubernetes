@@ -111,6 +111,9 @@ type VolumeHost interface {
 	// GetKubeClient returns a client interface
 	GetKubeClient() client.Interface
 
+	// Run a command in a container, returns the combined stdout, stderr as an array of bytes
+	RunInContainer(podFullName string, podUID types.UID, containerName string, cmd []string) ([]byte, error)
+
 	// NewWrapperBuilder finds an appropriate plugin with which to handle
 	// the provided spec.  This is used to implement volume plugins which
 	// "wrap" other plugins.  For example, the "secret" volume is
