@@ -556,6 +556,8 @@ type RBDVolumeSource struct {
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
 	ReadOnly bool `json:"readOnly,omitempty"`
+	// SidecarContainerName is the container's name to contain rbd package
+	SidecarContainerName string `json:"sidecar,omitempty"`
 }
 
 // ContainerPort represents a network port in a single container

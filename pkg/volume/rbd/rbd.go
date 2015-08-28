@@ -94,8 +94,18 @@ func (plugin *rbdPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.Vo
 		}
 
 	}
+
+	sidecar := source.SidecarContainerName
+	sidecar = "ceph/base"
+	if sidecar != "" {
+		err := plugin.createSidecarContainer(sidecar)
+		if err != nil {
+			glog.Errorf("Couldn't create sidecar %v/%v", pod.Namespace, err)
+			sidecar = ""
+		}
+	}
 	// Inject real implementations here, test through the internal function.
-	return plugin.newBuilderInternal(spec, pod.UID, &RBDUtil{}, mounter, secret)
+	return plugin.newBuilderInternal(spec, pod.UID, &RBDUtil{}, mounter, secret, sidecar)
 }
 
 func (plugin *rbdPlugin) getRBDVolumeSource(spec *volume.Spec) (*api.RBDVolumeSource, bool) {
@@ -108,7 +118,7 @@ func (plugin *rbdPlugin) getRBDVolumeSource(spec *volume.Spec) (*api.RBDVolumeSo
 	}
 }
 
-func (plugin *rbdPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface, secret string) (volume.Builder, error) {
+func (plugin *rbdPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface, secret string, sidecar string) (volume.Builder, error) {
 	source, readOnly := plugin.getRBDVolumeSource(spec)
 	pool := source.RBDPool
 	if pool == "" {
@@ -133,6 +143,7 @@ func (plugin *rbdPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID,
 			manager:  manager,
 			mounter:  mounter,
 			plugin:   plugin,
+			sidecar:  sidecar,
 		},
 		Mon:     source.CephMonitors,
 		Id:      id,
@@ -172,6 +183,7 @@ type rbd struct {
 	mounter  mount.Interface
 	// Utility interface that provides API calls to the provider to attach/detach disks.
 	manager diskManager
+	sidecar string
 }
 
 func (rbd *rbd) GetPath() string {
@@ -238,4 +250,58 @@ func (c *rbdCleaner) TearDownAt(dir string) error {
 func (plugin *rbdPlugin) execCommand(command string, args []string) ([]byte, error) {
 	cmd := plugin.exe.Command(command, args...)
 	return cmd.CombinedOutput()
+}
+
+func (plugin *rbdPlugin) createSidecarContainer(containerName string) error {
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			GenerateName: "rbd-sidecar-" + util.ShortenString("sidecar", 44) + "-",
+			Namespace:    api.NamespaceDefault,
+		},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicyNever,
+			Volumes: []api.Volume{
+				{
+					Name: "sys",
+					VolumeSource: api.VolumeSource{
+						HostPath: &api.HostPathVolumeSource{
+							Path: "/sys",
+						},
+					},
+				},
+				{
+					Name: "dev",
+					VolumeSource: api.VolumeSource{
+						HostPath: &api.HostPathVolumeSource{
+							Path: "/dev",
+						},
+					},
+				},
+			},
+			Containers: []api.Container{
+				{
+					Name:    "rbd-sidecar",
+					Image:   containerName,
+					Command: []string{"/bin/sh"},
+					Args:    []string{"-c", "while true; do sleep 30;done"},
+					VolumeMounts: []api.VolumeMount{
+						{
+							Name:      "dev",
+							MountPath: "/dev",
+						},
+						{
+							Name:      "sys",
+							MountPath: "/sys",
+						},
+					},
+				},
+			},
+		},
+	}
+	kubeClient := plugin.host.GetKubeClient()
+	pod, err := kubeClient.Pods(pod.Namespace).Create(pod)
+	if err != nil {
+		return fmt.Errorf("Failed to create pod %s:  %+v", pod.Name, err)
+	}
+	return nil
 }

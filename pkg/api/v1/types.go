@@ -568,6 +568,8 @@ type RBDVolumeSource struct {
 	// Defaults to false.
 	// More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it
 	ReadOnly bool `json:"readOnly,omitempty"`
+	// SidecarContainerName is the container's name to contain rbd package
+	SidecarContainerName string `json:"sidecar,omitempty"`
 }
 
 const (
