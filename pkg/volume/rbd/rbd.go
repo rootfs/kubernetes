@@ -21,6 +21,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
@@ -96,11 +97,10 @@ func (plugin *rbdPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.Vo
 	}
 
 	sidecar := source.SidecarContainerName
-	sidecar = "ceph/base"
 	if sidecar != "" {
-		err := plugin.createSidecarContainer(sidecar)
+		_, err := plugin.runInSidecarContainer(sidecar, []string{"rbd", "-h"})
 		if err != nil {
-			glog.Errorf("Couldn't create sidecar %v/%v", pod.Namespace, err)
+			glog.Errorf("Couldn't create sidecar %v", err)
 			sidecar = ""
 		}
 	}
@@ -252,10 +252,10 @@ func (plugin *rbdPlugin) execCommand(command string, args []string) ([]byte, err
 	return cmd.CombinedOutput()
 }
 
-func (plugin *rbdPlugin) createSidecarContainer(containerName string) error {
+func (plugin *rbdPlugin) runInSidecarContainer(containerName string, cmd []string) ([]byte, error) {
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			GenerateName: "rbd-sidecar-" + util.ShortenString("sidecar", 44) + "-",
+			GenerateName: "rbd-sidecar-",
 			Namespace:    api.NamespaceDefault,
 		},
 		Spec: api.PodSpec{
@@ -282,8 +282,8 @@ func (plugin *rbdPlugin) createSidecarContainer(containerName string) error {
 				{
 					Name:    "rbd-sidecar",
 					Image:   containerName,
-					Command: []string{"/bin/sh"},
-					Args:    []string{"-c", "while true; do sleep 30;done"},
+					Command: []string{"/bin/bash"},
+					Args:    []string{"-c", "sleep 120"},
 					VolumeMounts: []api.VolumeMount{
 						{
 							Name:      "dev",
@@ -301,7 +301,10 @@ func (plugin *rbdPlugin) createSidecarContainer(containerName string) error {
 	kubeClient := plugin.host.GetKubeClient()
 	pod, err := kubeClient.Pods(pod.Namespace).Create(pod)
 	if err != nil {
-		return fmt.Errorf("Failed to create pod %s:  %+v", pod.Name, err)
+		return nil, fmt.Errorf("Failed to create pod %s:  %+v", pod.Name, err)
 	}
-	return nil
+	defer kubeClient.Pods(pod.Namespace).Delete(pod.Name, nil)
+	podName := kubecontainer.GetPodFullName(pod)
+	//FIXME: should wait till container is up and running
+	return plugin.host.RunInContainer(podName, pod.UID, "rbd-sidecar", cmd)
 }

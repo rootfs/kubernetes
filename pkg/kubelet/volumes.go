@@ -79,6 +79,10 @@ func (vh *volumeHost) NewWrapperCleaner(spec *volume.Spec, podUID types.UID, mou
 	return c, nil
 }
 
+func (vh *volumeHost) RunInContainer(podFullName string, podUID types.UID, containerName string, cmd []string) ([]byte, error) {
+	return vh.kubelet.RunInContainer(podFullName, podUID, containerName, cmd)
+}
+
 func (kl *Kubelet) newVolumeBuilderFromPlugins(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
 	plugin, err := kl.volumePluginMgr.FindPluginBySpec(spec)
 	if err != nil {

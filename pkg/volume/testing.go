@@ -72,6 +72,10 @@ func (f *fakeVolumeHost) NewWrapperCleaner(spec *Spec, podUID types.UID, mounter
 	return plug.NewCleaner(spec.Name, podUID, mounter)
 }
 
+func (vh *fakeVolumeHost) RunInContainer(podFullName string, podUID types.UID, containerName string, cmd []string) ([]byte, error) {
+	return nil, nil
+}
+
 // FakeVolumePlugin is useful for testing.  It tries to be a fully compliant
 // plugin, but all it does is make empty directories.
 // Use as:

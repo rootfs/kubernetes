@@ -121,6 +121,9 @@ type VolumeHost interface {
 	// the provided spec.  See comments on NewWrapperBuilder for more
 	// context.
 	NewWrapperCleaner(spec *Spec, podUID types.UID, mounter mount.Interface) (Cleaner, error)
+
+	// Run a command in a container, returns the combined stdout, stderr as an array of bytes
+	RunInContainer(podFullName string, podUID types.UID, containerName string, cmd []string) ([]byte, error)
 }
 
 // VolumePluginMgr tracks registered plugins.

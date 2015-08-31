@@ -1716,6 +1716,7 @@ func convert_api_RBDVolumeSource_To_v1_RBDVolumeSource(in *api.RBDVolumeSource, 
 		out.SecretRef = nil
 	}
 	out.ReadOnly = in.ReadOnly
+	out.SidecarContainerName = in.SidecarContainerName
 	return nil
 }
 
@@ -4081,6 +4082,7 @@ func convert_v1_RBDVolumeSource_To_api_RBDVolumeSource(in *RBDVolumeSource, out 
 		out.SecretRef = nil
 	}
 	out.ReadOnly = in.ReadOnly
+	out.SidecarContainerName = in.SidecarContainerName
 	return nil
 }
 
