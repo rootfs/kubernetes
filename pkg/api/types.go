@@ -206,8 +206,7 @@ type VolumeSource struct {
 
 	// DownwardAPI represents metadata about the pod that should populate this volume
 	DownwardAPI *DownwardAPIVolumeSource `json:"downwardAPI,omitempty"`
-	// FC represents a Fibre Channel resource that is attached to a
-	// kubelet's host machine and then exposed to the pod.
+	// FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.
 	FC *FCVolumeSource `json:"fc,omitempty"`
 }
 
@@ -238,8 +237,7 @@ type PersistentVolumeSource struct {
 	Cinder *CinderVolumeSource `json:"cinder,omitempty"`
 	// CephFS represents a Ceph FS mount on the host that shares a pod's lifetime
 	CephFS *CephFSVolumeSource `json:"cephfs,omitempty"`
-	// FC represents a Fibre Channel resource that is attached to a
-	// kubelet's host machine and then exposed to the pod.
+	// FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.
 	FC *FCVolumeSource `json:"fc,omitempty"`
 }
 
@@ -463,7 +461,7 @@ type FCVolumeSource struct {
 	// Required: FC target world wide names (WWNs)
 	TargetWWNs []string `json:"targetWWNs"`
 	// Required: FC target lun number
-	Lun int `json:"lun"`
+	Lun *int64 `json:"lun"`
 	// Required: Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs"

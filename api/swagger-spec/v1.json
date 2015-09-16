@@ -12125,7 +12125,7 @@
      },
      "fc": {
       "$ref": "v1.FCVolumeSource",
-      "description": "kubelet's host machine and then exposed to the pod."
+      "description": "FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod."
      },
      "accessModes": {
       "type": "array",
@@ -12418,7 +12418,7 @@
      },
      "lun": {
       "type": "integer",
-      "format": "int32",
+      "format": "int64",
       "description": "Required: FC target lun number"
      },
      "fsType": {
@@ -12644,7 +12644,7 @@
      },
      "fc": {
       "$ref": "v1.FCVolumeSource",
-      "description": "kubelet's host machine and then exposed to the pod."
+      "description": "FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod."
      }
     }
    },

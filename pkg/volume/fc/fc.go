@@ -17,6 +17,7 @@ limitations under the License.
 package fc
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/golang/glog"
@@ -93,7 +94,11 @@ func (plugin *fcPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, 
 		readOnly = spec.ReadOnly
 	}
 
-	lun := strconv.Itoa(fc.Lun)
+	if fc.Lun == nil {
+		return nil, fmt.Errorf("empty lun")
+	}
+
+	lun := strconv.Itoa(int(*fc.Lun))
 
 	return &fcDiskBuilder{
 		fcDisk: &fcDisk{

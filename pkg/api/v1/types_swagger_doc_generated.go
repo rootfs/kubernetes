@@ -856,7 +856,7 @@ var map_PersistentVolumeSource = map[string]string{
 	"iscsi":                "ISCSI represents an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod. Provisioned by an admin.",
 	"cinder":               "Cinder represents a cinder volume attached and mounted on kubelets host machine More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
 	"cephfs":               "CephFS represents a Ceph FS mount on the host that shares a pod's lifetime",
-	"fc":                   "kubelet's host machine and then exposed to the pod.",
+	"fc":                   "FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.",
 }
 
 func (PersistentVolumeSource) SwaggerDoc() map[string]string {
@@ -1389,7 +1389,7 @@ var map_VolumeSource = map[string]string{
 	"cinder":      "Cinder represents a cinder volume attached and mounted on kubelets host machine More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
 	"cephfs":      "CephFS represents a Ceph FS mount on the host that shares a pod's lifetime",
 	"downwardAPI": "DownwardAPI represents downward API about the pod that should populate this volume",
-	"fc":          "kubelet's host machine and then exposed to the pod.",
+	"fc":          "FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.",
 }
 
 func (VolumeSource) SwaggerDoc() map[string]string {

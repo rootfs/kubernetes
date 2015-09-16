@@ -442,7 +442,7 @@ func validateFCVolumeSource(fc *api.FCVolumeSource) errs.ValidationErrorList {
 	if fc.FSType == "" {
 		allErrs = append(allErrs, errs.NewFieldRequired("fsType"))
 	}
-	if fc.Lun < 0 || fc.Lun > 255 {
+	if fc.Lun == nil || *fc.Lun < 0 || *fc.Lun > 255 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("lun", fc.Lun, ""))
 	}
 	return allErrs

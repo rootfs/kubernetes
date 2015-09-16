@@ -651,7 +651,12 @@ func convert_api_FCVolumeSource_To_v1_FCVolumeSource(in *api.FCVolumeSource, out
 	} else {
 		out.TargetWWNs = nil
 	}
-	out.Lun = in.Lun
+	if in.Lun != nil {
+		out.Lun = new(int64)
+		*out.Lun = *in.Lun
+	} else {
+		out.Lun = nil
+	}
 	out.FSType = in.FSType
 	out.ReadOnly = in.ReadOnly
 	return nil
@@ -3047,7 +3052,12 @@ func convert_v1_FCVolumeSource_To_api_FCVolumeSource(in *FCVolumeSource, out *ap
 	} else {
 		out.TargetWWNs = nil
 	}
-	out.Lun = in.Lun
+	if in.Lun != nil {
+		out.Lun = new(int64)
+		*out.Lun = *in.Lun
+	} else {
+		out.Lun = nil
+	}
 	out.FSType = in.FSType
 	out.ReadOnly = in.ReadOnly
 	return nil
