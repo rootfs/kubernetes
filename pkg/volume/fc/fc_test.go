@@ -165,13 +165,14 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 }
 
 func TestPluginVolume(t *testing.T) {
+	lun := 0
 	vol := &api.Volume{
 		Name: "vol1",
 		VolumeSource: api.VolumeSource{
 			FC: &api.FCVolumeSource{
 				TargetWWNs: []string{"some_wwn"},
 				FSType:     "ext4",
-				Lun:        0,
+				Lun:        &lun,
 			},
 		},
 	}
@@ -179,6 +180,7 @@ func TestPluginVolume(t *testing.T) {
 }
 
 func TestPluginPersistentVolume(t *testing.T) {
+	lun := 0
 	vol := &api.PersistentVolume{
 		ObjectMeta: api.ObjectMeta{
 			Name: "vol1",
@@ -188,7 +190,7 @@ func TestPluginPersistentVolume(t *testing.T) {
 				FC: &api.FCVolumeSource{
 					TargetWWNs: []string{"some_wwn"},
 					FSType:     "ext4",
-					Lun:        0,
+					Lun:        &lun,
 				},
 			},
 		},
@@ -197,6 +199,7 @@ func TestPluginPersistentVolume(t *testing.T) {
 }
 
 func TestPersistentClaimReadOnlyFlag(t *testing.T) {
+	lun := 0
 	pv := &api.PersistentVolume{
 		ObjectMeta: api.ObjectMeta{
 			Name: "pvA",
@@ -206,7 +209,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 				FC: &api.FCVolumeSource{
 					TargetWWNs: []string{"some_wwn"},
 					FSType:     "ext4",
-					Lun:        0,
+					Lun:        &lun,
 				},
 			},
 			ClaimRef: &api.ObjectReference{
@@ -241,7 +244,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	// readOnly bool is supplied by persistent-claim volume source when its builder creates other volumes
 	spec := volume.NewSpecFromPersistentVolume(pv, true)
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
-	builder, _ := plug.NewBuilder(spec, pod, volume.VolumeOptions{}, nil)
+	builder, _ := plug.NewBuilder(spec, pod, volume.VolumeOptions{})
 
 	if !builder.IsReadOnly() {
 		t.Errorf("Expected true for builder.IsReadOnly")

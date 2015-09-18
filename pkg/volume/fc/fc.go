@@ -76,9 +76,9 @@ func (plugin *fcPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
 	}
 }
 
-func (plugin *fcPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
+func (plugin *fcPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Builder, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newBuilderInternal(spec, pod.UID, &FCUtil{}, mounter)
+	return plugin.newBuilderInternal(spec, pod.UID, &FCUtil{}, plugin.host.GetMounter())
 }
 
 func (plugin *fcPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Builder, error) {
@@ -115,9 +115,9 @@ func (plugin *fcPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, 
 	}, nil
 }
 
-func (plugin *fcPlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
+func (plugin *fcPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newCleanerInternal(volName, podUID, &FCUtil{}, mounter)
+	return plugin.newCleanerInternal(volName, podUID, &FCUtil{}, plugin.host.GetMounter())
 }
 
 func (plugin *fcPlugin) newCleanerInternal(volName string, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Cleaner, error) {
