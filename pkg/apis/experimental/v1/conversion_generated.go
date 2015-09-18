@@ -301,7 +301,7 @@ func convert_api_FCVolumeSource_To_v1_FCVolumeSource(in *api.FCVolumeSource, out
 		out.TargetWWNs = nil
 	}
 	if in.Lun != nil {
-		out.Lun = new(int64)
+		out.Lun = new(int)
 		*out.Lun = *in.Lun
 	} else {
 		out.Lun = nil
@@ -1081,7 +1081,7 @@ func convert_v1_FCVolumeSource_To_api_FCVolumeSource(in *v1.FCVolumeSource, out 
 		out.TargetWWNs = nil
 	}
 	if in.Lun != nil {
-		out.Lun = new(int64)
+		out.Lun = new(int)
 		*out.Lun = *in.Lun
 	} else {
 		out.Lun = nil

@@ -263,7 +263,7 @@ func deepCopy_api_FCVolumeSource(in api.FCVolumeSource, out *api.FCVolumeSource,
 		out.TargetWWNs = nil
 	}
 	if in.Lun != nil {
-		out.Lun = new(int64)
+		out.Lun = new(int)
 		*out.Lun = *in.Lun
 	} else {
 		out.Lun = nil

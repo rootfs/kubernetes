@@ -443,7 +443,7 @@ func validateFCVolumeSource(fc *api.FCVolumeSource) errs.ValidationErrorList {
 		allErrs = append(allErrs, errs.NewFieldRequired("fsType"))
 	}
 	if fc.Lun == nil || *fc.Lun < 0 || *fc.Lun > 255 {
-		allErrs = append(allErrs, errs.NewFieldInvalid("lun", fc.Lun, ""))
+		allErrs = append(allErrs, errs.NewFieldRequired("lun"))
 	}
 	return allErrs
 }

@@ -597,7 +597,7 @@ func deepCopy_v1_FCVolumeSource(in FCVolumeSource, out *FCVolumeSource, c *conve
 		out.TargetWWNs = nil
 	}
 	if in.Lun != nil {
-		out.Lun = new(int64)
+		out.Lun = new(int)
 		*out.Lun = *in.Lun
 	} else {
 		out.Lun = nil

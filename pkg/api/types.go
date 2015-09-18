@@ -461,7 +461,7 @@ type FCVolumeSource struct {
 	// Required: FC target world wide names (WWNs)
 	TargetWWNs []string `json:"targetWWNs"`
 	// Required: FC target lun number
-	Lun *int64 `json:"lun"`
+	Lun *int `json:"lun"`
 	// Required: Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs"
