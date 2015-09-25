@@ -29,10 +29,12 @@ import (
 	"math/rand"
 	"os"
 	"path"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/volume"
@@ -44,23 +46,19 @@ func getDevFromImageAndPool(pool, image string) (string, bool) {
 	sys_path := "/sys/bus/rbd/devices"
 	if dirs, err := ioutil.ReadDir(sys_path); err == nil {
 		for _, f := range dirs {
-			name := f.Name()
-			po := path.Join(sys_path, name, "pool")
-			img := path.Join(sys_path, name, "name")
-			if _, err = os.Lstat(po); err != nil {
-				continue
-			}
-			if _, err := os.Lstat(img); err != nil {
-				continue
-			}
-
 			// pool and name format:
 			// see rbd_pool_show() and rbd_name_show() at
 			// https://github.com/torvalds/linux/blob/master/drivers/block/rbd.c
-			if b, err := ioutil.ReadFile(po); err != nil || string(b) != pool+"\n" {
+			name := f.Name()
+			po := path.Join(sys_path, name, "pool")
+			img := path.Join(sys_path, name, "name")
+			exe := exec.New()
+			out, err := exe.Command("cat", po, img).CombinedOutput()
+			if err != nil {
 				continue
 			}
-			if b, err := ioutil.ReadFile(img); err != nil || string(b) != image+"\n" {
+			matched, err := regexp.MatchString(pool+"\n"+image+"\n", string(out))
+			if err != nil || !matched {
 				continue
 			}
 			// found a match, check if device exists
