@@ -261,6 +261,8 @@ func (util *RBDUtil) AttachDisk(b rbdBuilder) error {
 
 	// fence off other mappers
 	if err := util.fencing(b); err != nil {
+		// rbd unmap before exit
+		b.plugin.execCommand("rbd", []string{"unmap", devicePath})
 		return fmt.Errorf("rbd: image %s is locked by other nodes", b.Image)
 	}
 	// rbd lock remove needs ceph and image config
