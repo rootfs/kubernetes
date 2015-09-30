@@ -667,6 +667,7 @@ func (dm *DockerManager) runContainer(
 			Tty:          container.TTY,
 			AttachStdout: container.Stdout,
 			AttachStderr: container.Stderr,
+			RootMount:    container.RootMount,
 		},
 	}
 

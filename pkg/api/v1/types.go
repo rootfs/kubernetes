@@ -996,6 +996,8 @@ type Container struct {
 	// Whether this container should send stderr.
 	// Default is false.
 	Stderr bool `json:"stderr,omitempty"`
+	// Rootfs mount propagation mode
+	RootMount string `json:"rootmount,omitempty"`
 }
 
 // Handler defines a specific action that should be taken

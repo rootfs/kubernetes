@@ -194,6 +194,7 @@ func deepCopy_v1_Container(in v1.Container, out *v1.Container, c *conversion.Clo
 	out.TTY = in.TTY
 	out.Stdout = in.Stdout
 	out.Stderr = in.Stderr
+	out.RootMount = in.RootMount
 	return nil
 }
 

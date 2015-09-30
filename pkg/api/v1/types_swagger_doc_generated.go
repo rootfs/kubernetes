@@ -146,6 +146,7 @@ var map_Container = map[string]string{
 	"tty":                    "Whether this container should allocate a TTY for itself, also requires 'stdin' to be true. Default is false.",
 	"stdout":                 "Whether this container should send stdout. Default is false.",
 	"stderr":                 "Whether this container should send stderr. Default is false.",
+	"rootmount":              "Rootfs mount propagation mode",
 }
 
 func (Container) SwaggerDoc() map[string]string {

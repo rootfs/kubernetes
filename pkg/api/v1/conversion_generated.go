@@ -263,6 +263,7 @@ func convert_api_Container_To_v1_Container(in *api.Container, out *Container, s 
 	out.TTY = in.TTY
 	out.Stdout = in.Stdout
 	out.Stderr = in.Stderr
+	out.RootMount = in.RootMount
 	return nil
 }
 
@@ -2668,6 +2669,7 @@ func convert_v1_Container_To_api_Container(in *Container, out *api.Container, s 
 	out.TTY = in.TTY
 	out.Stdout = in.Stdout
 	out.Stderr = in.Stderr
+	out.RootMount = in.RootMount
 	return nil
 }
 

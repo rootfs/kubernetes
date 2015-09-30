@@ -12777,6 +12777,10 @@
      "stderr": {
       "type": "boolean",
       "description": "Whether this container should send stderr. Default is false."
+     },
+     "rootmount": {
+      "type": "string",
+      "description": "Rootfs mount propagation mode"
      }
     }
    },

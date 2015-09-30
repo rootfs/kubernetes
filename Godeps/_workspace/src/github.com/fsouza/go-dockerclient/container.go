@@ -215,6 +215,7 @@ type Config struct {
 	OnBuild         []string            `json:"OnBuild,omitempty" yaml:"OnBuild,omitempty"`
 	Mounts          []Mount             `json:"Mounts,omitempty" yaml:"Mounts,omitempty"`
 	Labels          map[string]string   `json:"Labels,omitempty" yaml:"Labels,omitempty"`
+	RootMount       string              `json:"RootMount,omitempty" yaml:"RootMount,omitempty"`
 }
 
 // Mount represents a mount point in the container.
