@@ -17,6 +17,7 @@ limitations under the License.
 package glusterfs
 
 import (
+	"fmt"
 	"math/rand"
 	"os"
 
@@ -232,6 +233,94 @@ func (b *glusterfsBuilder) setUpAtInternal(dir string) error {
 			return nil
 		}
 	}
+	// try containerized mount
+	for i := start; i < start+l; i++ {
+		hostIP := b.hosts.Subsets[i%l].Addresses[0].IP
+		cmd := []string{"mount", "-t", "glusterfs", hostIP + ":" + b.path, "/host/" + dir}
+		//FIXME: container image hard coded to fs_client
+		out, err := b.plugin.runInSidecarContainer("fs_client", cmd)
+		glog.Infof("Glusterfs: container mount output %s: err:%v", out, err)
+		notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
+		if mntErr == nil && !notMnt {
+			glog.Infof("Glusterfs: container mount output succeeded")
+			return nil
+		}
+	}
 	glog.Errorf("Glusterfs: mount failed: %v", errs)
 	return errs
+}
+
+func (plugin *glusterfsPlugin) runInSidecarContainer(containerName string, cmd []string) ([]byte, error) {
+	priv := true
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			GenerateName: "glusterfs-mounter-",
+			Namespace:    api.NamespaceDefault,
+		},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicyAlways,
+			HostNetwork:   true,
+			Volumes: []api.Volume{
+				{
+					Name: "host",
+					VolumeSource: api.VolumeSource{
+						HostPath: &api.HostPathVolumeSource{
+							Path: "/",
+						},
+					},
+				},
+				{
+					Name: "var",
+					VolumeSource: api.VolumeSource{
+						HostPath: &api.HostPathVolumeSource{
+							Path: "/var",
+						},
+					},
+				},
+				{
+					Name: "dev",
+					VolumeSource: api.VolumeSource{
+						HostPath: &api.HostPathVolumeSource{
+							Path: "/dev",
+						},
+					},
+				},
+			},
+			Containers: []api.Container{
+				{
+					Name:  "glusterfs-mounter",
+					Image: containerName,
+					SecurityContext: &api.SecurityContext{
+						Privileged: &priv,
+					},
+					Command: []string{"sleep"},
+					Args:    []string{"infinity"},
+					Stdout:  true,
+					Stderr:  true,
+					VolumeMounts: []api.VolumeMount{
+						{
+							Name:      "var",
+							MountPath: "/var",
+						},
+						{
+							Name:      "dev",
+							MountPath: "/dev",
+						},
+						{
+							Name:      "host",
+							MountPath: "/host",
+						},
+					},
+					RootMount: "container_shared",
+				},
+			},
+		},
+	}
+	kubeClient := plugin.host.GetKubeClient()
+	pod, err := kubeClient.Pods(pod.Namespace).Create(pod)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to create pod %s:  %+v", pod.Name, err)
+	}
+	container := &pod.Spec.Containers[0]
+	return plugin.host.RunContainerCommand(pod, container, cmd, true)
 }

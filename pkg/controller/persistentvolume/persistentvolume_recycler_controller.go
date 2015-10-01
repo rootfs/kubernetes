@@ -234,6 +234,6 @@ func (f *PersistentVolumeRecycler) GetCloudProvider() cloudprovider.Interface {
 	return nil
 }
 
-func (f *PersistentVolumeRecycler) RunContainerCommand(pod *api.Pod, container *api.Container, cmd []string) ([]byte, error) {
+func (f *PersistentVolumeRecycler) RunContainerCommand(pod *api.Pod, container *api.Container, cmd []string, keepalive bool) ([]byte, error) {
 	return nil, fmt.Errorf("RunInContainer not supported by PVClaimBinder's VolumeHost implementation")
 }

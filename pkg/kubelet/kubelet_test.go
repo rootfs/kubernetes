@@ -797,7 +797,7 @@ func (f *fakeContainerCommandRunner) PortForward(pod *kubecontainer.Pod, port ui
 	return nil
 }
 
-func (f *fakeContainerCommandRunner) RunContainerCommand(pod *api.Pod, container *api.Container, cmd []string) ([]byte, error) {
+func (f *fakeContainerCommandRunner) RunContainerCommand(pod *api.Pod, container *api.Container, cmd []string, keepalive bool) ([]byte, error) {
 	return nil, f.E
 }
 

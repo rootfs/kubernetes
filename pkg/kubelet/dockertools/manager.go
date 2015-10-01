@@ -1876,7 +1876,7 @@ func (dm *DockerManager) doBackOff(pod *api.Pod, container *api.Container, podSt
 }
 
 // create and start a container then log the output
-func (dm *DockerManager) RunContainerCommand(pod *api.Pod, container *api.Container, cmd []string) ([]byte, error) {
+func (dm *DockerManager) RunContainerCommand(pod *api.Pod, container *api.Container, cmd []string, keepalive bool) ([]byte, error) {
 	opts, err := dm.generator.GenerateRunContainerOptions(pod, container)
 	if err != nil {
 		return nil, err
@@ -1897,10 +1897,14 @@ func (dm *DockerManager) RunContainerCommand(pod *api.Pod, container *api.Contai
 	if err != nil {
 		return nil, err
 	}
-	defer dm.KillContainerInPod("", container, pod)
-
+	if !keepalive {
+		defer dm.KillContainerInPod("", container, pod)
+	}
+	if len(cmd) > 0 {
+		return dm.RunInContainer(id, cmd)
+	}
 	var stdout, stderr bytes.Buffer
-	if err := dm.GetContainerLogs(pod, id, "all", true, &stdout, &stderr); err != nil {
+	if err := dm.GetContainerLogs(pod, id, "all", false, &stdout, &stderr); err != nil {
 		return nil, err
 	}
 	out := append(stdout.Bytes(), stderr.Bytes()...)

@@ -127,7 +127,7 @@ type VolumeHost interface {
 	GetCloudProvider() cloudprovider.Interface
 
 	// Runs the command in the container
-	RunContainerCommand(pod *api.Pod, container *api.Container, cmd []string) ([]byte, error)
+	RunContainerCommand(pod *api.Pod, container *api.Container, cmd []string, keepalive bool) ([]byte, error)
 }
 
 // VolumePluginMgr tracks registered plugins.

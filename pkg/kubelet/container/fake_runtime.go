@@ -313,7 +313,7 @@ func (f *FakeRuntime) PortForward(pod *Pod, port uint16, stream io.ReadWriteClos
 	return f.Err
 }
 
-func (f *FakeRuntime) RunContainerCommand(pod *api.Pod, container *api.Container, cmd []string) ([]byte, error) {
+func (f *FakeRuntime) RunContainerCommand(pod *api.Pod, container *api.Container, cmd []string, keepalive bool) ([]byte, error) {
 	f.Lock()
 	defer f.Unlock()
 

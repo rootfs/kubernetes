@@ -91,7 +91,7 @@ func ProbeVolumePlugins(config VolumeConfig) []VolumePlugin {
 	return []VolumePlugin{&FakeVolumePlugin{PluginName: "fake-plugin"}}
 }
 
-func (f *fakeVolumeHost) RunContainerCommand(pod *api.Pod, container *api.Container, cmd []string) ([]byte, error) {
+func (f *fakeVolumeHost) RunContainerCommand(pod *api.Pod, container *api.Container, cmd []string, keepalive bool) ([]byte, error) {
 	return nil, nil
 }
 

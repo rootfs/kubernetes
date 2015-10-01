@@ -304,5 +304,5 @@ func (plugin *rbdPlugin) runInSidecarContainer(containerName string, cmd []strin
 	}
 	defer kubeClient.Pods(pod.Namespace).Delete(pod.Name, nil)
 	container := &pod.Spec.Containers[0]
-	return plugin.host.RunContainerCommand(pod, container, cmd)
+	return plugin.host.RunContainerCommand(pod, container, nil, false)
 }

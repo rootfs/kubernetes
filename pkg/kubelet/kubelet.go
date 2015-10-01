@@ -2788,7 +2788,7 @@ func extractBandwidthResources(pod *api.Pod) (ingress, egress *resource.Quantity
 }
 
 // Runs the command in the container
-func (kl *Kubelet) RunContainerCommand(pod *api.Pod, container *api.Container, cmd []string) ([]byte, error) {
+func (kl *Kubelet) RunContainerCommand(pod *api.Pod, container *api.Container, cmd []string, keepalive bool) ([]byte, error) {
 	// Mount volumes.
 	podFullName := kubecontainer.GetPodFullName(pod)
 	podVolumes, err := kl.mountExternalVolumes(pod)
@@ -2798,5 +2798,5 @@ func (kl *Kubelet) RunContainerCommand(pod *api.Pod, container *api.Container, c
 	}
 	kl.volumeManager.SetVolumes(pod.UID, podVolumes)
 
-	return kl.runner.RunContainerCommand(pod, container, cmd)
+	return kl.runner.RunContainerCommand(pod, container, cmd, keepalive)
 }

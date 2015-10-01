@@ -104,7 +104,7 @@ type ContainerCommandRunner interface {
 	// Forward the specified port from the specified pod to the stream.
 	PortForward(pod *Pod, port uint16, stream io.ReadWriteCloser) error
 	// Runs the command in the container
-	RunContainerCommand(pod *api.Pod, container *api.Container, cmd []string) ([]byte, error)
+	RunContainerCommand(pod *api.Pod, container *api.Container, cmd []string, keepalive bool) ([]byte, error)
 }
 
 // ImagePuller wraps Runtime.PullImage() to pull a container image.

@@ -1144,7 +1144,7 @@ func (r *runtime) ExecInContainer(containerID string, cmd []string, stdin io.Rea
 }
 
 //TODO placeholder
-func (r *runtime) RunContainerCommand(pod *api.Pod, container *api.Container, cmd []string) ([]byte, error) {
+func (r *runtime) RunContainerCommand(pod *api.Pod, container *api.Container, cmd []string, keepalive bool) ([]byte, error) {
 	return nil, fmt.Errorf("not supported")
 }
 
