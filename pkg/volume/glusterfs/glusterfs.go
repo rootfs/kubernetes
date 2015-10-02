@@ -17,9 +17,11 @@ limitations under the License.
 package glusterfs
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"os"
+	"path"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -193,6 +195,13 @@ func (c *glusterfsCleaner) cleanup(dir string) error {
 		return err
 	}
 	if notMnt {
+		var pod *api.Pod
+		pod = nil
+		errs := c.plugin.loadPod(pod, dir)
+		if errs == nil {
+			c.plugin.deletePod(pod.Namespace, pod.Name)
+			c.plugin.removePod(dir)
+		}
 		return os.RemoveAll(dir)
 	}
 
@@ -206,6 +215,14 @@ func (c *glusterfsCleaner) cleanup(dir string) error {
 		return mntErr
 	}
 	if notMnt {
+		var pod *api.Pod
+		pod = nil
+		errs := c.plugin.loadPod(pod, dir)
+		if errs == nil {
+			c.plugin.deletePod(pod.Namespace, pod.Name)
+			c.plugin.removePod(dir)
+		}
+
 		if err := os.RemoveAll(dir); err != nil {
 			return err
 		}
@@ -234,11 +251,19 @@ func (b *glusterfsBuilder) setUpAtInternal(dir string) error {
 		}
 	}
 	// try containerized mount
+	//FIXME: container image hard coded to fs_client
+	pod, err := b.plugin.createSidecarContainer("fs_client")
+	if pod == nil {
+		glog.Errorf("Glusterfs: failed to create mounter pod: %v", err)
+		return errs
+	}
+	// persist pod
+	b.plugin.persistPod(pod, dir)
+
 	for i := start; i < start+l; i++ {
 		hostIP := b.hosts.Subsets[i%l].Addresses[0].IP
 		cmd := []string{"mount", "-t", "glusterfs", hostIP + ":" + b.path, "/host/" + dir}
-		//FIXME: container image hard coded to fs_client
-		out, err := b.plugin.runInSidecarContainer("fs_client", cmd)
+		out, err := b.plugin.runInSidecarContainer(pod, cmd)
 		glog.Infof("Glusterfs: container mount output %s: err:%v", out, err)
 		notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 		if mntErr == nil && !notMnt {
@@ -246,11 +271,13 @@ func (b *glusterfsBuilder) setUpAtInternal(dir string) error {
 			return nil
 		}
 	}
+	b.plugin.deletePod(pod.Namespace, pod.Name)
+	b.plugin.removePod(dir)
 	glog.Errorf("Glusterfs: mount failed: %v", errs)
 	return errs
 }
 
-func (plugin *glusterfsPlugin) runInSidecarContainer(containerName string, cmd []string) ([]byte, error) {
+func (plugin *glusterfsPlugin) createSidecarContainer(containerName string) (*api.Pod, error) {
 	priv := true
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -259,7 +286,7 @@ func (plugin *glusterfsPlugin) runInSidecarContainer(containerName string, cmd [
 		},
 		Spec: api.PodSpec{
 			RestartPolicy: api.RestartPolicyAlways,
-			HostNetwork:   true,
+			//HostNetwork:   true,
 			Volumes: []api.Volume{
 				{
 					Name: "host",
@@ -321,6 +348,53 @@ func (plugin *glusterfsPlugin) runInSidecarContainer(containerName string, cmd [
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create pod %s:  %+v", pod.Name, err)
 	}
+
+	return pod, nil
+}
+
+func (plugin *glusterfsPlugin) runInSidecarContainer(pod *api.Pod, cmd []string) ([]byte, error) {
 	container := &pod.Spec.Containers[0]
 	return plugin.host.RunContainerCommand(pod, container, cmd, true)
+}
+
+func (plugin *glusterfsPlugin) deletePod(namespace, name string) {
+	kubeClient := plugin.host.GetKubeClient()
+	kubeClient.Pods(namespace).Delete(name, nil)
+}
+
+func (plugin *glusterfsPlugin) persistPod(pod *api.Pod, mnt string) error {
+	file := path.Join(mnt, "pod.json")
+	fp, err := os.Create(file)
+	if err != nil {
+		return fmt.Errorf("Glusterfs: create err %s/%s", file, err)
+	}
+	defer fp.Close()
+
+	encoder := json.NewEncoder(fp)
+	if err = encoder.Encode(pod); err != nil {
+		return fmt.Errorf("Glusterfs: encode err: %v.", err)
+	}
+
+	return nil
+}
+
+func (plugin *glusterfsPlugin) loadPod(pod *api.Pod, mnt string) error {
+	file := path.Join(mnt, "pod.json")
+	fp, err := os.Open(file)
+	if err != nil {
+		return fmt.Errorf("Glusterfs: open err %s/%s", file, err)
+	}
+	defer fp.Close()
+
+	decoder := json.NewDecoder(fp)
+	if err = decoder.Decode(pod); err != nil {
+		return fmt.Errorf("Glusterfs: decode err: %v.", err)
+	}
+
+	return nil
+}
+
+func (plugin *glusterfsPlugin) removePod(mnt string) {
+	file := path.Join(mnt, "pod.json")
+	os.Remove(file)
 }
