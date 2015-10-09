@@ -17,6 +17,7 @@ limitations under the License.
 package glusterfs
 
 import (
+	"fmt"
 	"os"
 	"path"
 
@@ -31,11 +32,12 @@ import (
 
 // This is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&glusterfsPlugin{nil}}
+	return []volume.VolumePlugin{&glusterfsPlugin{nil, exec.New()}}
 }
 
 type glusterfsPlugin struct {
 	host volume.VolumeHost
+	exe  exec.Interface
 }
 
 var _ volume.VolumePlugin = &glusterfsPlugin{}
@@ -54,8 +56,18 @@ func (plugin *glusterfsPlugin) Name() string {
 }
 
 func (plugin *glusterfsPlugin) CanSupport(spec *volume.Spec) bool {
-	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.Glusterfs != nil) ||
-		(spec.Volume != nil && spec.Volume.Glusterfs != nil)
+	if (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.Glusterfs == nil) ||
+		(spec.Volume != nil && spec.Volume.Glusterfs == nil) {
+		return false
+	}
+	// see if glusterfs mount helper is there
+	_, err := plugin.execCommand("ls", []string{"/sbin/mount.glusterfs"})
+	if err == nil {
+		return true
+	}
+
+	return false
+
 }
 
 func (plugin *glusterfsPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
@@ -115,6 +127,11 @@ func (plugin *glusterfsPlugin) newCleanerInternal(volName string, podUID types.U
 		pod:     &api.Pod{ObjectMeta: api.ObjectMeta{UID: podUID}},
 		plugin:  plugin,
 	}}, nil
+}
+
+func (plugin *glusterfsPlugin) execCommand(command string, args []string) ([]byte, error) {
+	cmd := plugin.exe.Command(command, args...)
+	return cmd.CombinedOutput()
 }
 
 // Glusterfs volumes represent a bare host file or directory mount of an Glusterfs export.
@@ -188,25 +205,22 @@ func (c *glusterfsCleaner) TearDownAt(dir string) error {
 func (c *glusterfsCleaner) cleanup(dir string) error {
 	notMnt, err := c.mounter.IsLikelyNotMountPoint(dir)
 	if err != nil {
-		glog.Errorf("Glusterfs: Error checking IsLikelyNotMountPoint: %v", err)
-		return err
+		return fmt.Errorf("Glusterfs: Error checking IsLikelyNotMountPoint: %v", err)
 	}
 	if notMnt {
 		return os.RemoveAll(dir)
 	}
 
 	if err := c.mounter.Unmount(dir); err != nil {
-		glog.Errorf("Glusterfs: Unmounting failed: %v", err)
-		return err
+		return fmt.Errorf("Glusterfs: Unmounting failed: %v", err)
 	}
 	notMnt, mntErr := c.mounter.IsLikelyNotMountPoint(dir)
 	if mntErr != nil {
-		glog.Errorf("Glusterfs: IsLikelyNotMountPoint check failed: %v", mntErr)
-		return mntErr
+		return fmt.Errorf("Glusterfs: IsLikelyNotMountPoint check failed: %v", mntErr)
 	}
 	if notMnt {
 		if err := os.RemoveAll(dir); err != nil {
-			return err
+			return fmt.Errorf("Glusterfs: RemoveAll failed: %v", err)
 		}
 	}
 
@@ -223,7 +237,7 @@ func (b *glusterfsBuilder) setUpAtInternal(dir string) error {
 
 	p := path.Join(b.glusterfs.plugin.host.GetPluginDir(glusterfsPluginName), b.glusterfs.volName)
 	if err := os.MkdirAll(p, 0750); err != nil {
-		return err
+		return fmt.Errorf("Glusterfs: mkdir failed: %v", err)
 	}
 	log := path.Join(p, "glusterfs.log")
 	options = append(options, "log-file="+log)
@@ -243,6 +257,5 @@ func (b *glusterfsBuilder) setUpAtInternal(dir string) error {
 			return nil
 		}
 	}
-	glog.Errorf("Glusterfs: mount failed: %v", errs)
-	return errs
+	return fmt.Errorf("Glusterfs: mount failed: %v", errs)
 }
