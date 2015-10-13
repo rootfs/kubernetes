@@ -465,7 +465,7 @@ func (HostPathVolumeSource) SwaggerDoc() map[string]string {
 
 var map_ISCSIVolumeSource = map[string]string{
 	"":             "ISCSIVolumeSource describes an ISCSI Disk can only be mounted as read/write once.",
-	"targetPortal": "iSCSI target portal. The portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
+	"targetPortal": "Required: iSCSI target portal the portal is ip_addr:port",
 	"iqn":          "Target iSCSI Qualified Name.",
 	"lun":          "iSCSI target lun number.",
 	"fsType":       "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#iscsi",

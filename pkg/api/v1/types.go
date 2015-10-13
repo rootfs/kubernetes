@@ -703,8 +703,8 @@ type NFSVolumeSource struct {
 
 // ISCSIVolumeSource describes an ISCSI Disk can only be mounted as read/write once.
 type ISCSIVolumeSource struct {
-	// iSCSI target portal. The portal is either an IP or ip_addr:port if the port
-	// is other than default (typically TCP ports 860 and 3260).
+	// Required: iSCSI target portal
+	// the portal is ip_addr:port
 	TargetPortal string `json:"targetPortal"`
 	// Target iSCSI Qualified Name.
 	IQN string `json:"iqn"`

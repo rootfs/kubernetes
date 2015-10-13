@@ -445,7 +445,7 @@ type GCEPersistentDiskVolumeSource struct {
 // A ISCSI Disk can only be mounted as read/write once.
 type ISCSIVolumeSource struct {
 	// Required: iSCSI target portal
-	// the portal is either an IP or ip_addr:port if port is other than default (typically TCP ports 860 and 3260)
+	// the portal is ip_addr:port
 	TargetPortal string `json:"targetPortal,omitempty"`
 	// Required:  target iSCSI Qualified Name
 	IQN string `json:"iqn,omitempty"`

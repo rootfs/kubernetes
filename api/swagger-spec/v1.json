@@ -12449,7 +12449,7 @@
     "properties": {
      "targetPortal": {
       "type": "string",
-      "description": "iSCSI target portal. The portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260)."
+      "description": "Required: iSCSI target portal the portal is ip_addr:port"
      },
      "iqn": {
       "type": "string",
