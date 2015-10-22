@@ -56,11 +56,11 @@ func isVolumeConflict(volume api.Volume, pod *api.Pod) bool {
 	if volume.GCEPersistentDisk != nil {
 		disk := volume.GCEPersistentDisk
 
-		manifest := &(pod.Spec)
-		for ix := range manifest.Volumes {
-			if manifest.Volumes[ix].GCEPersistentDisk != nil &&
-				manifest.Volumes[ix].GCEPersistentDisk.PDName == disk.PDName &&
-				!(manifest.Volumes[ix].GCEPersistentDisk.ReadOnly && disk.ReadOnly) {
+		podSpec := &(pod.Spec)
+		for ix := range podSpec.Volumes {
+			if podSpec.Volumes[ix].GCEPersistentDisk != nil &&
+				podSpec.Volumes[ix].GCEPersistentDisk.PDName == disk.PDName &&
+				!(podSpec.Volumes[ix].GCEPersistentDisk.ReadOnly && disk.ReadOnly) {
 				return true
 			}
 		}
@@ -68,10 +68,10 @@ func isVolumeConflict(volume api.Volume, pod *api.Pod) bool {
 	if volume.AWSElasticBlockStore != nil {
 		volumeID := volume.AWSElasticBlockStore.VolumeID
 
-		manifest := &(pod.Spec)
-		for ix := range manifest.Volumes {
-			if manifest.Volumes[ix].AWSElasticBlockStore != nil &&
-				manifest.Volumes[ix].AWSElasticBlockStore.VolumeID == volumeID {
+		podSpec := &(pod.Spec)
+		for ix := range podSpec.Volumes {
+			if podSpec.Volumes[ix].AWSElasticBlockStore != nil &&
+				podSpec.Volumes[ix].AWSElasticBlockStore.VolumeID == volumeID {
 				return true
 			}
 		}
@@ -81,12 +81,12 @@ func isVolumeConflict(volume api.Volume, pod *api.Pod) bool {
 		pool := volume.RBD.RBDPool
 		image := volume.RBD.RBDImage
 
-		manifest := &(pod.Spec)
-		for ix := range manifest.Volumes {
-			if manifest.Volumes[ix].RBD != nil {
-				mon_m := manifest.Volumes[ix].RBD.CephMonitors
-				pool_m := manifest.Volumes[ix].RBD.RBDPool
-				image_m := manifest.Volumes[ix].RBD.RBDImage
+		podSpec := &(pod.Spec)
+		for ix := range podSpec.Volumes {
+			if podSpec.Volumes[ix].RBD != nil {
+				mon_m := podSpec.Volumes[ix].RBD.CephMonitors
+				pool_m := podSpec.Volumes[ix].RBD.RBDPool
+				image_m := podSpec.Volumes[ix].RBD.RBDImage
 				if haveSame(mon, mon_m) && pool_m == pool && image_m == image {
 					return true
 				}
@@ -97,9 +97,8 @@ func isVolumeConflict(volume api.Volume, pod *api.Pod) bool {
 }
 
 // NoDiskConflict evaluates if a pod can fit due to the volumes it requests, and those that
-// are already mounted. Some times of volumes are mounted onto node machines.  For now, these mounts
-// are exclusive so if there is already a volume mounted on that node, another pod can't schedule
-// there. This is GCE, Amazon EBS, and Ceph RBD specific for now.
+// are already mounted. If there is already a volume mounted on that node, another pod that uses the same volume
+// can't be scheduled there. This is GCE, Amazon EBS, and Ceph RBD specific for now.
 // TODO: migrate this into some per-volume specific code?
 func NoDiskConflict(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
 	manifest := &(pod.Spec)
