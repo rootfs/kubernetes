@@ -185,18 +185,8 @@ func (rbd *rbd) SetUpAt(dir string) error {
 	err := diskSetUp(rbd.manager, *rbd, dir, rbd.mounter)
 	if err != nil {
 		glog.Errorf("rbd: failed to setup")
-		return err
 	}
-	globalPDPath := rbd.manager.MakeGlobalPDName(*rbd)
-	// make mountpoint rw/ro work as expected
-	//FIXME revisit pkg/util/mount and ensure rw/ro is implemented as expected
-	mode := "rw"
-	if rbd.ReadOnly {
-		mode = "ro"
-	}
-	rbd.plugin.execCommand("mount", []string{"-o", "remount," + mode, globalPDPath, dir})
-
-	return nil
+	return err
 }
 
 // Unmounts the bind mount, and detaches the disk only if the disk
