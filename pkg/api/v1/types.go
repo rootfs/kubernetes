@@ -261,6 +261,8 @@ type VolumeSource struct {
 	DownwardAPI *DownwardAPIVolumeSource `json:"downwardAPI,omitempty"`
 	// FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.
 	FC *FCVolumeSource `json:"fc,omitempty"`
+	// AzureFile represents an Azure File Service mount on the host that shares a pod's lifetime
+	AzureFile *AzureFileVolumeSource `json:"azureFile,omitempty"`
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
@@ -319,6 +321,8 @@ type PersistentVolumeSource struct {
 	// provisioned/attached using a exec based plugin. This is an
 	// alpha feature and may change in future.
 	FlexVolume *FlexVolumeSource `json:"flexVolume,omitempty"`
+	// AzureFile represents an Azure File Service mount on the host that shares a pod's lifetime
+	AzureFile *AzureFileVolumeSource `json:"azureFile,omitempty"`
 }
 
 // PersistentVolume (PV) is a storage resource provisioned by an administrator.
@@ -787,6 +791,19 @@ type FCVolumeSource struct {
 	// TODO: how do we prevent errors in the filesystem from compromising the machine
 	FSType string `json:"fsType"`
 	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	ReadOnly bool `json:"readOnly,omitempty"`
+}
+
+// AzureFile represents an Azure File Service mount on the host that shares a pod's lifetime
+type AzureFileVolumeSource struct {
+	// Azure File Service Account Name
+	AccountName string `json:"accountName"`
+	// the name of Azure File Service Account Key ending in ==
+	KeyName string `json:"keyName"`
+	// Share Name
+	ShareName string `json:"shareName"`
+	// Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
 	ReadOnly bool `json:"readOnly,omitempty"`
 }

@@ -15,6 +15,10 @@
 			"Rev": "'75cd24fc2f2c2a2088577d12123ddee5f54e0675'"
 		},
 		{
+			"ImportPath": "github.com/Azure/azure-sdk-for-go/storage",
+			"Rev": "3b480eaaf6b4236d43a3c06cba969da6f53c8b66"
+		},
+		{
 			"ImportPath": "github.com/ClusterHQ/flocker-go",
 			"Rev": "3f33ece70f6571f0ec45bfae2f243ab11fab6c52"
 		},

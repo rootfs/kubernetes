@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: azure-key
+type: Opague
+data:
+  key: Zm9vIC1uCg==
