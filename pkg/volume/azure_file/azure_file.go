@@ -22,8 +22,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 
 	"github.com/golang/glog"
@@ -45,8 +45,9 @@ const (
 	azureFilePluginName = "kubernetes.io/azure-file"
 )
 
-func (plugin *azureFilePlugin) Init(host volume.VolumeHost) {
+func (plugin *azureFilePlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
+	return nil
 }
 
 func (plugin *azureFilePlugin) Name() string {
@@ -120,7 +121,7 @@ type azureFile struct {
 
 func (azureFileVolume *azureFile) GetPath() string {
 	name := azureFilePluginName
-	return azureFileVolume.plugin.host.GetPodVolumeDir(azureFileVolume.pod.UID, util.EscapeQualifiedNameForDisk(name), azureFileVolume.volName)
+	return azureFileVolume.plugin.host.GetPodVolumeDir(azureFileVolume.pod.UID, strings.EscapeQualifiedNameForDisk(name), azureFileVolume.volName)
 }
 
 type azureFileBuilder struct {
@@ -136,19 +137,18 @@ var _ volume.Builder = &azureFileBuilder{}
 
 func (b *azureFileBuilder) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:                    b.readOnly,
-		Managed:                     !b.readOnly,
-		SupportsOwnershipManagement: true,
-		SupportsSELinux:             false,
+		ReadOnly:        b.readOnly,
+		Managed:         !b.readOnly,
+		SupportsSELinux: false,
 	}
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *azureFileBuilder) SetUp() error {
-	return b.SetUpAt(b.GetPath())
+func (b *azureFileBuilder) SetUp(fsGroup *int64) error {
+	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
-func (b *azureFileBuilder) SetUpAt(dir string) error {
+func (b *azureFileBuilder) SetUpAt(dir string, fsGroup *int64) error {
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	glog.V(4).Infof("AzureFile mount set up: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {
