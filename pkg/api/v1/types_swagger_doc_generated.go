@@ -39,6 +39,18 @@ func (AWSElasticBlockStoreVolumeSource) SwaggerDoc() map[string]string {
 	return map_AWSElasticBlockStoreVolumeSource
 }
 
+var map_AzureFileVolumeSource = map[string]string{
+	"":            "AzureFile represents an Azure File Service mount on the host that shares a pod's lifetime",
+	"accountName": "Azure File Service Account Name",
+	"keyName":     "the name of Azure File Service Account Key ending in ==",
+	"shareName":   "Share Name",
+	"readOnly":    "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+}
+
+func (AzureFileVolumeSource) SwaggerDoc() map[string]string {
+	return map_AzureFileVolumeSource
+}
+
 var map_Binding = map[string]string{
 	"":         "Binding ties one object to another. For example, a pod is bound to a node by a scheduler.",
 	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -930,6 +942,7 @@ var map_PersistentVolumeSource = map[string]string{
 	"fc":                   "FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.",
 	"flocker":              "Flocker represents a Flocker volume attached to a kubelet's host machine and exposed to the pod for its usage. This depends on the Flocker control service being running",
 	"flexVolume":           "FlexVolume represents a generic volume resource that is provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.",
+	"azureFile":            "AzureFile represents an Azure File Service mount on the host that shares a pod's lifetime",
 }
 
 func (PersistentVolumeSource) SwaggerDoc() map[string]string {
@@ -1471,6 +1484,7 @@ var map_VolumeSource = map[string]string{
 	"flocker":     "Flocker represents a Flocker volume attached to a kubelet's host machine. This depends on the Flocker control service being running",
 	"downwardAPI": "DownwardAPI represents downward API about the pod that should populate this volume",
 	"fc":          "FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.",
+	"azureFile":   "AzureFile represents an Azure File Service mount on the host that shares a pod's lifetime",
 }
 
 func (VolumeSource) SwaggerDoc() map[string]string {

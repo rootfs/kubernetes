@@ -15269,6 +15269,8 @@
      "options": {
       "type": "any",
       "description": "Optional: Extra command options if any."
+     }
+    }
    },
    "v1.AzureFileVolumeSource": {
     "id": "v1.AzureFileVolumeSource",

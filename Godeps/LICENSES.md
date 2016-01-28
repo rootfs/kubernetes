@@ -10,6 +10,7 @@ github.com/appc/cni | Apache-2
 github.com/appc/spec | Apache-2
 github.com/armon/go-metrics | MITname
 github.com/aws/aws-sdk-go | Apache-2
+github.com/Azure/azure-sdk-for-go | Apache-2
 github.com/beorn7/perks/quantile | MIT?
 github.com/blang/semver | MITname
 github.com/boltdb/bolt | MITname
