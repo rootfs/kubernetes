@@ -32,6 +32,7 @@ import (
 func init() {
 	if err := Scheme.AddGeneratedDeepCopyFuncs(
 		DeepCopy_api_AWSElasticBlockStoreVolumeSource,
+		DeepCopy_api_AzureFileVolumeSource,
 		DeepCopy_api_Binding,
 		DeepCopy_api_Capabilities,
 		DeepCopy_api_CephFSVolumeSource,
@@ -179,6 +180,13 @@ func DeepCopy_api_AWSElasticBlockStoreVolumeSource(in AWSElasticBlockStoreVolume
 	out.VolumeID = in.VolumeID
 	out.FSType = in.FSType
 	out.Partition = in.Partition
+	out.ReadOnly = in.ReadOnly
+	return nil
+}
+
+func DeepCopy_api_AzureFileVolumeSource(in AzureFileVolumeSource, out *AzureFileVolumeSource, c *conversion.Cloner) error {
+	out.SecretName = in.SecretName
+	out.ShareName = in.ShareName
 	out.ReadOnly = in.ReadOnly
 	return nil
 }
@@ -1715,6 +1723,15 @@ func DeepCopy_api_PersistentVolumeSource(in PersistentVolumeSource, out *Persist
 	} else {
 		out.Flocker = nil
 	}
+	if in.AzureFile != nil {
+		in, out := in.AzureFile, &out.AzureFile
+		*out = new(AzureFileVolumeSource)
+		if err := DeepCopy_api_AzureFileVolumeSource(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.AzureFile = nil
+	}
 	return nil
 }
 
@@ -2790,6 +2807,15 @@ func DeepCopy_api_VolumeSource(in VolumeSource, out *VolumeSource, c *conversion
 		}
 	} else {
 		out.FC = nil
+	}
+	if in.AzureFile != nil {
+		in, out := in.AzureFile, &out.AzureFile
+		*out = new(AzureFileVolumeSource)
+		if err := DeepCopy_api_AzureFileVolumeSource(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.AzureFile = nil
 	}
 	return nil
 }
