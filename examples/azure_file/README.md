@@ -42,7 +42,7 @@ Then create a Pod using the volume spec based on [azure](azure.yaml).
 In the pod, you need to provide the following information:
 
 - *secretName*:  the name of the secret that contains both Azure storage account name and key.
-- *shareName*: The share name to be used. 
+- *shareName*: The share name to be used.
 - *readOnly*: Whether the filesystem is used as readOnly.
 
 Create the secret:

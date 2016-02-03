@@ -67,7 +67,7 @@ Familiarity with [pods](pods.md) is suggested.
     - [persistentVolumeClaim](#persistentvolumeclaim)
     - [downwardAPI](#downwardapi)
     - [FlexVolume](#flexvolume)
-    - [AzureFileVolume](#azureFile)
+    - [AzureFileVolume](#azurefilevolume)
   - [Resources](#resources)
 
 <!-- END MUNGE: GENERATED_TOC -->
@@ -431,8 +431,8 @@ More details are in [here](../../examples/flexvolume/README.md)
 
 ### AzureFileVolume
 
-A `AzureFileVolume` is used to mount a Microsoft Azure File Volume (SMB 2.1 and 3.0) 
-into a Pod. 
+A `AzureFileVolume` is used to mount a Microsoft Azure File Volume (SMB 2.1 and 3.0)
+into a Pod.
 
 More details can be found [here](../../examples/azure_file/README.md)
 

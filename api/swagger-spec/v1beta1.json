@@ -3936,7 +3936,7 @@
    },
    "v1.AzureFileVolumeSource": {
     "id": "v1.AzureFileVolumeSource",
-    "description": "AzureFile represents an Azure File Service mount on the host that shares a pod's lifetime",
+    "description": "AzureFileVolumeSource represents an Azure File Service mount on the host that shares a pod's lifetime",
     "required": [
      "secretName",
      "shareName"

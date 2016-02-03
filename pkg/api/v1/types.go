@@ -795,7 +795,7 @@ type FCVolumeSource struct {
 	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
-// AzureFile represents an Azure File Service mount on the host that shares a pod's lifetime
+// AzureFileVolumeSource represents an Azure File Service mount on the host that shares a pod's lifetime
 type AzureFileVolumeSource struct {
 	// the name of secret that contains Azure Storage Account Name and Key
 	SecretName string `json:"secretName"`

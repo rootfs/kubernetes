@@ -40,7 +40,7 @@ func (AWSElasticBlockStoreVolumeSource) SwaggerDoc() map[string]string {
 }
 
 var map_AzureFileVolumeSource = map[string]string{
-	"":           "AzureFile represents an Azure File Service mount on the host that shares a pod's lifetime",
+	"":           "AzureFileVolumeSource represents an Azure File Service mount on the host that shares a pod's lifetime",
 	"secretName": "the name of secret that contains Azure Storage Account Name and Key",
 	"shareName":  "Share Name",
 	"readOnly":   "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
