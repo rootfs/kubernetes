@@ -402,8 +402,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"job":           &extensions.Job{},
 		},
 		"../examples/azure_file": {
-			"azure-key": &api.Secret{},
-			"azure":     &api.Pod{},
+			"azure": &api.Pod{},
 		},
 	}
 

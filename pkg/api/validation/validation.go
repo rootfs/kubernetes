@@ -720,11 +720,8 @@ func validateFlexVolumeSource(fv *api.FlexVolumeSource, fldPath *field.Path) fie
 
 func validateAzureFile(azure *api.AzureFileVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if azure.AccountName == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("accountName"), ""))
-	}
-	if azure.KeyName == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("keyName"), ""))
+	if azure.SecretName == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("secretName"), ""))
 	}
 	if azure.ShareName == "" {
 		allErrs = append(allErrs, field.Required(fldPath.Child("shareName"), ""))

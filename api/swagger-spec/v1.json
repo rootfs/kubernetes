@@ -15276,18 +15276,13 @@
     "id": "v1.AzureFileVolumeSource",
     "description": "AzureFile represents an Azure File Service mount on the host that shares a pod's lifetime",
     "required": [
-     "accountName",
-     "keyName",
+     "secretName",
      "shareName"
     ],
     "properties": {
-     "accountName": {
+     "secretName": {
       "type": "string",
-      "description": "Azure File Service Account Name"
-     },
-     "keyName": {
-      "type": "string",
-      "description": "the name of Azure File Service Account Key ending in =="
+      "description": "the name of secret that contains Azure Storage Account Name and Key"
      },
      "shareName": {
       "type": "string",

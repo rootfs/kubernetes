@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -89,11 +89,10 @@ func (plugin *azureFilePlugin) newBuilderInternal(spec *volume.Spec, pod *api.Po
 			pod:     pod,
 			plugin:  plugin,
 		},
-		util:        util,
-		accountName: source.AccountName,
-		keyName:     source.KeyName,
-		shareName:   source.ShareName,
-		readOnly:    readOnly,
+		util:       util,
+		secretName: source.SecretName,
+		shareName:  source.ShareName,
+		readOnly:   readOnly,
 	}, nil
 }
 
@@ -126,11 +125,10 @@ func (azureFileVolume *azureFile) GetPath() string {
 
 type azureFileBuilder struct {
 	*azureFile
-	util        azureUtil
-	accountName string
-	keyName     string
-	shareName   string
-	readOnly    bool
+	util       azureUtil
+	secretName string
+	shareName  string
+	readOnly   bool
 }
 
 var _ volume.Builder = &azureFileBuilder{}
@@ -157,14 +155,14 @@ func (b *azureFileBuilder) SetUpAt(dir string, fsGroup *int64) error {
 	if !notMnt {
 		return nil
 	}
-	var accountKey string
-	if accountKey, err = b.util.SetupAzureFileSvc(b.plugin.host, b.pod.Namespace, b.keyName, b.accountName, b.shareName); err != nil {
+	var accountKey, accountName string
+	if accountName, accountKey, err = b.util.SetupAzureFileSvc(b.plugin.host, b.pod.Namespace, b.secretName, b.shareName); err != nil {
 		return err
 	}
 	os.MkdirAll(dir, 0750)
-	source := fmt.Sprintf("//%s.file.core.windows.net/%s", b.accountName, b.shareName)
+	source := fmt.Sprintf("//%s.file.core.windows.net/%s", accountName, b.shareName)
 	// parameters suggested by https://azure.microsoft.com/en-us/documentation/articles/storage-how-to-use-files-linux/
-	options := []string{fmt.Sprintf("vers=3.0,username=%s,password=%s,dir_mode=0777,file_mode=0777", b.accountName, accountKey)}
+	options := []string{fmt.Sprintf("vers=3.0,username=%s,password=%s,dir_mode=0777,file_mode=0777", accountName, accountKey)}
 	if b.readOnly {
 		options = append(options, "ro")
 	}

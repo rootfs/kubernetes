@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/client/testing/fake"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
@@ -97,9 +97,8 @@ func TestPlugin(t *testing.T) {
 		Name: "vol1",
 		VolumeSource: api.VolumeSource{
 			AzureFile: &api.AzureFileVolumeSource{
-				AccountName: "foo",
-				KeyName:     "bar",
-				ShareName:   "share",
+				SecretName: "secret",
+				ShareName:  "share",
 			},
 		},
 	}
@@ -182,7 +181,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 		},
 	}
 
-	client := testclient.NewSimpleFake(pv, claim)
+	client := fake.NewSimpleClientset(pv, claim)
 
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", client, nil))
@@ -200,8 +199,8 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 
 type fakeAzureSvc struct{}
 
-func (s *fakeAzureSvc) SetupAzureFileSvc(host volume.VolumeHost, nameSpace, keyName, accountName, shareName string) (string, error) {
-	return "key", nil
+func (s *fakeAzureSvc) SetupAzureFileSvc(host volume.VolumeHost, nameSpace, secretName, shareName string) (string, string, error) {
+	return "name", "key", nil
 }
 
 func TestBuilderAndCleanerTypeAssert(t *testing.T) {
@@ -221,9 +220,8 @@ func TestBuilderAndCleanerTypeAssert(t *testing.T) {
 		Name: "vol1",
 		VolumeSource: api.VolumeSource{
 			AzureFile: &api.AzureFileVolumeSource{
-				AccountName: "foo",
-				KeyName:     "bar==",
-				ShareName:   "share",
+				SecretName: "secret",
+				ShareName:  "share",
 			},
 		},
 	}

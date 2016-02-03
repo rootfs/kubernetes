@@ -12,6 +12,6 @@ spec:
  volumes:
       - name: azure
         azureFile:
-          accountName: account_name
-          keyName: azure-key
-          shareName: share_name
+          secretName: azure-secret
+          shareName: k8stest
+          readOnly: false

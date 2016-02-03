@@ -29,28 +29,29 @@ Documentation for other releases can be found at
 
 # How to Use it?
 
-Install *cifs-utils* on the Kubernetes host. For example, on Fedora
+Install *cifs-utils* on the Kubernetes host. For example, on Fedora based Linux
 
     # yum -y install cifs-utils
 
 Note, as explained in [Azure File Storage for Linux](https://azure.microsoft.com/en-us/documentation/articles/storage-how-to-use-files-linux/), the Linux hosts and the file share must be in the same Azure region.
 
-Obtain an Microsoft Azure storage account and create a [secret](azure-key.yaml) that contains the base64 encoded Azure account key and Pod based on [azure](azure.yaml).
+Obtain an Microsoft Azure storage account and create a [secret](secret/azure-secret.yaml) that contains the base64 encoded Azure Storage account name and key. In the secret file, base64-encode Azure Storage account name and pair it with name *azurestorageaccountname*, and base64-encode Azure Storage access key and pair it with name *azurestorageaccountkey*.
 
-In the pod yaml, you need to provide the following information.
+Then create a Pod using the volume spec based on [azure](azure.yaml).
 
-- *accountName*:  Azure storage account name.
-- *keyName*: name of the Azure storage account key that ends in "=="
-- *shareName*: The share name to be used. If the share doesn't exist, it will be created by kubelet.
+In the pod, you need to provide the following information:
+
+- *secretName*:  the name of the secret that contains both Azure storage account name and key.
+- *shareName*: The share name to be used. 
 - *readOnly*: Whether the filesystem is used as readOnly.
 
 Create the secret:
 
 ```console
-    # kubectl create -f examples/azure_file/azure-key.yaml
+    # kubectl create -f examples/azure_file/secret/azure-secret.yaml
 ```
 
-You should see the key from `kubectl get secret`
+You should see the account name and key from `kubectl get secret`
 
 Then create the Pod:
 

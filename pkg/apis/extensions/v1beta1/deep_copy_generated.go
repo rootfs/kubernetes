@@ -74,8 +74,7 @@ func deepCopy_v1_AWSElasticBlockStoreVolumeSource(in v1.AWSElasticBlockStoreVolu
 }
 
 func deepCopy_v1_AzureFileVolumeSource(in v1.AzureFileVolumeSource, out *v1.AzureFileVolumeSource, c *conversion.Cloner) error {
-	out.AccountName = in.AccountName
-	out.KeyName = in.KeyName
+	out.SecretName = in.SecretName
 	out.ShareName = in.ShareName
 	out.ReadOnly = in.ReadOnly
 	return nil

@@ -678,10 +678,8 @@ type DownwardAPIVolumeFile struct {
 
 // AzureFile represents an Azure File Service mount on the host that shares a pod's lifetime
 type AzureFileVolumeSource struct {
-	// Azure File Service Account Name
-	AccountName string `json:"accountName"`
-	// the name of Azure File Service Account Key ending in ==
-	KeyName string `json:"keyName"`
+	// the name of secret that contains Azure Storage Account Name and Key
+	SecretName string `json:"secretName"`
 	// Share Name
 	ShareName string `json:"shareName"`
 	// Defaults to false (read/write). ReadOnly here will force
