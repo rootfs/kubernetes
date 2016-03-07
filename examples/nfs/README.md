@@ -1,38 +1,27 @@
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
-<!-- BEGIN STRIP_FOR_RELEASE -->
 
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
+<!-- END MUNGE: UNVERSIONED_WARNING -->
 
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+# Outline
 
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
+![alt text][nfs pv example]
 
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
 [here](http://releases.k8s.io/release-1.2/examples/nfs/README.md).
 
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
+As illustrated above, two persistent volumes are used in this example:
 
-<!-- END STRIP_FOR_RELEASE -->
+- Web frontend Pod uses a persistent volume based on NFS server, and
+- NFS server uses an auto provisioned persistent volume from GCE PD or AWS EBS.
 
-<!-- END MUNGE: UNVERSIONED_WARNING -->
+Note, this is a *not* a production ready NFS setup.
 
-# Example of NFS volume
+[nfs pv example]: nfs-pv.png
+
+# Example of NFS based persistent volume
 
 See [nfs-web-rc.yaml](nfs-web-rc.yaml) for a quick example of how to use an NFS
 volume claim in a replication controller. It relies on the
@@ -49,16 +38,21 @@ controller and import it into two replication controllers.
 Define [NFS server controller](nfs-server-rc.yaml) and
 [NFS service](nfs-server-service.yaml):
 
+The NFS server exports an an auto-provisioned persistent volume backed by GCE PD:
+
+```console
+$ kubectl create -f examples/nfs/provisioner/nfs-server-gce-pv.yaml
+```
+
 ```console
 $ kubectl create -f examples/nfs/nfs-server-rc.yaml
 $ kubectl create -f examples/nfs/nfs-server-service.yaml
 ```
 
-The server exports `/mnt/data` directory as `/` (fsid=0). The
-directory contains dummy `index.html`. Wait until the pod is running
+The directory contains dummy `index.html`. Wait until the pod is running
 by checking `kubectl get pods -lrole=nfs-server`.
 
-### Create the NFS claim
+### Create the NFS based persistent volume claim
 
 The [NFS busybox controller](nfs-busybox-rc.yaml) uses a simple script to
 generate data written to the NFS server we just started. First, you'll need to
@@ -143,6 +137,13 @@ $ kubectl exec nfs-busybox-jdhf3 -- wget -qO- http://10.0.68.37
 Thu Oct 22 19:28:55 UTC 2015
 nfs-busybox-w3s4t
 ```
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
