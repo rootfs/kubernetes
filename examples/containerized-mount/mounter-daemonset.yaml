@@ -1,0 +1,17 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  labels:
+    name: mounter
+  name: mounter
+spec:
+   template:
+     metadata:
+        labels:
+          app: mounter
+     spec:
+        hostNetwork: true
+        containers:
+          - image: hchen/daemonbox
+            name:  daemonbox
+
