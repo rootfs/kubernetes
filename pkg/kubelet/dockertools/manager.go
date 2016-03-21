@@ -439,6 +439,12 @@ func makeMountBindings(mounts []kubecontainer.Mount, podHasSELinuxLabel bool) (r
 			}
 
 		}
+		//FIXME: hack to turn on shared mount namespace propagation
+		if !m.ReadOnly && !(m.SELinuxRelabel && podHasSELinuxLabel) {
+			bind += ":rshared"
+		} else {
+			bind += ",rshared"
+		}
 		result = append(result, bind)
 	}
 	return
