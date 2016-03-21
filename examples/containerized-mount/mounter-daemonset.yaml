@@ -14,4 +14,12 @@ spec:
         containers:
           - image: hchen/daemonbox
             name:  daemonbox
-
+            securityContext:
+              privileged: true
+            volumeMounts: 
+              - name: host
+                mountPath: /host
+        volumes:
+          - name: host
+            hostPath:
+              path: /
