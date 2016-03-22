@@ -20,7 +20,6 @@ ADD run_nfs.sh /usr/local/bin/
 ADD index.html /exports/index.html
 RUN chmod 644 /exports/index.html
 
-# expose mountd 20048/tcp and nfsd 2049/tcp
-EXPOSE 2049/tcp 20048/tcp
+EXPOSE 2049/tcp
 
 ENTRYPOINT ["/usr/local/bin/run_nfs.sh", "/exports"]
