@@ -84,7 +84,31 @@ func (plugin *glusterfsPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ vol
 		return nil, err
 	}
 	glog.V(1).Infof("glusterfs: endpoints %v", ep)
-	return plugin.newBuilderInternal(spec, ep, pod, plugin.host.GetMounter(), exec.New())
+	mounter := plugin.host.GetMounter()
+	rootfs := "/"
+	if _, err := plugin.execCommand("/bin/ls", []string{"/sbin/mount.glusterfs"}); err != nil {
+		// FIXME: make ds mounter label and path default
+		cf, err := plugin.host.GetKubeClient().Core().ConfigMaps(api.NamespaceDefault).Get("ds-mounter")
+		if err != nil {
+			glog.Errorf("glusterfs: no ds-mounter configMap provided[%v]", err)
+			return nil, err
+		}
+		port := cf.Data["api-port"]
+		cmdPath := cf.Data["api-path"]
+		hostBindPath := cf.Data["host-bind-path"]
+		if port == "" || cmdPath == "" || hostBindPath == "" {
+			return nil, fmt.Errorf("glusterfs: no valid ds-mounter configMap provided[%v]")
+		}
+		// try DaemonSet mounter
+		mounter = mount.NewDSMounter(port, cmdPath, hostBindPath)
+		if mounter != nil {
+			glog.V(1).Infof("glusterfs: use ds mounter %s/%s", port, cmdPath)
+		} else {
+			return nil, fmt.Errorf("glusterfs: cannot init ds mounter")
+		}
+		rootfs = hostBindPath
+	}
+	return plugin.newBuilderInternal(spec, ep, pod, mounter, exec.New(), rootfs)
 }
 
 func (plugin *glusterfsPlugin) getGlusterVolumeSource(spec *volume.Spec) (*api.GlusterfsVolumeSource, bool) {
@@ -97,7 +121,7 @@ func (plugin *glusterfsPlugin) getGlusterVolumeSource(spec *volume.Spec) (*api.G
 	}
 }
 
-func (plugin *glusterfsPlugin) newBuilderInternal(spec *volume.Spec, ep *api.Endpoints, pod *api.Pod, mounter mount.Interface, exe exec.Interface) (volume.Builder, error) {
+func (plugin *glusterfsPlugin) newBuilderInternal(spec *volume.Spec, ep *api.Endpoints, pod *api.Pod, mounter mount.Interface, exe exec.Interface, rootfs string) (volume.Builder, error) {
 	source, readOnly := plugin.getGlusterVolumeSource(spec)
 	return &glusterfsBuilder{
 		glusterfs: &glusterfs{
@@ -106,6 +130,7 @@ func (plugin *glusterfsPlugin) newBuilderInternal(spec *volume.Spec, ep *api.End
 			pod:     pod,
 			plugin:  plugin,
 		},
+		rootfs:   rootfs,
 		hosts:    ep,
 		path:     source.Path,
 		readOnly: readOnly,
@@ -145,6 +170,7 @@ type glusterfsBuilder struct {
 	path     string
 	readOnly bool
 	exe      exec.Interface
+	rootfs   string
 }
 
 var _ volume.Builder = &glusterfsBuilder{}
@@ -241,7 +267,7 @@ func (b *glusterfsBuilder) setUpAtInternal(dir string) error {
 		return fmt.Errorf("glusterfs: mkdir failed: %v", err)
 	}
 	log := path.Join(p, "glusterfs.log")
-	options = append(options, "log-file="+log)
+	options = append(options, "log-file="+b.rootfs+log)
 
 	addr := make(map[string]struct{})
 	for _, s := range b.hosts.Subsets {
