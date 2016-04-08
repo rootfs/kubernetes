@@ -207,6 +207,8 @@ type TestContextType struct {
 	// It accepts namespace base name, which will be prepended with e2e prefix, kube client
 	// and labels to be applied to a namespace.
 	CreateTestingNS CreateTestingNSFn
+	// Currently supported values are 'selinux' for selinux support. It is a comma seperated list.
+	HostCap string
 }
 
 var testContext TestContextType
@@ -369,6 +371,20 @@ func SkipUnlessServerVersionGTE(v semver.Version, c discovery.ServerVersionInter
 	}
 	if !gte {
 		Skipf("Not supported for server versions before %q", v)
+	}
+}
+
+func SkipUnlessNodeEnableSELinux() {
+	caps := strings.Split(testContext.HostCap, ",")
+	found := false
+	for _, cap := range caps {
+		if cap == "selinux" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		Skipf("No SELinux support")
 	}
 }
 

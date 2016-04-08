@@ -95,6 +95,7 @@ func RegisterFlags() {
 	flag.BoolVar(&testContext.GatherLogsSizes, "gather-logs-sizes", false, "If set to true framework will be monitoring logs sizes on all machines running e2e tests.")
 	flag.BoolVar(&testContext.GatherMetricsAfterTest, "gather-metrics-at-teardown", false, "If set to true framwork will gather metrics from all components after each test.")
 	flag.StringVar(&testContext.OutputPrintType, "output-print-type", "hr", "Comma separated list: 'hr' for human readable summaries 'json' for JSON ones.")
+	flag.StringVar(&testContext.HostCap, "host-capabilities", "", "Comma separated list: 'selinux' for selinux support.")
 }
 
 // setupProviderConfig validates and sets up cloudConfig based on testContext.Provider.
