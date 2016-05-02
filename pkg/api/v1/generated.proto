@@ -66,6 +66,34 @@ message Affinity {
   optional NodeAffinity nodeAffinity = 1;
 }
 
+// AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
+message AzureDiskVolumeSource {
+  // the name of secret that contains Azure Client ID, Client Secret, Subscription ID, and Azure Resource Group (ARM) name
+  optional string secretName = 1;
+
+  // Data Disk Name
+  optional string diskName = 2;
+
+  // Data Disk URI
+  optional string diskURI = 3;
+
+  // Host Caching mode: None, Read Only, Read Write.
+  optional string cachingMode = 4;
+
+  // The partition in the volume to mount.
+  // If omitted, the default is to mount by volume name.
+  optional int32 partition = 8;
+
+  // Filesystem type to mount.
+  // Must be a filesystem type supported by the host operating system.
+  // Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+  optional string fsType = 6;
+
+  // Defaults to false (read/write). ReadOnly here will force
+  // the ReadOnly setting in VolumeMounts.
+  optional bool readOnly = 7;
+}
+
 // AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
 message AzureFileVolumeSource {
   // the name of secret that contains Azure Storage Account Name and Key
@@ -1631,6 +1659,9 @@ message PersistentVolumeSource {
 
   // AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
   optional AzureFileVolumeSource azureFile = 13;
+
+  // AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
+  optional AzureDiskVolumeSource azureDisk = 14;
 }
 
 // PersistentVolumeSpec is the specification of a persistent volume.
@@ -2660,5 +2691,8 @@ message VolumeSource {
 
   // ConfigMap represents a configMap that should populate this volume
   optional ConfigMapVolumeSource configMap = 19;
+
+  // AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
+  optional AzureDiskVolumeSource azureDisk = 20;
 }
 

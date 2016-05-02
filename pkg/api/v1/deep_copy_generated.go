@@ -34,6 +34,7 @@ func init() {
 	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
 		DeepCopy_v1_AWSElasticBlockStoreVolumeSource,
 		DeepCopy_v1_Affinity,
+		DeepCopy_v1_AzureDiskVolumeSource,
 		DeepCopy_v1_AzureFileVolumeSource,
 		DeepCopy_v1_Binding,
 		DeepCopy_v1_Capabilities,
@@ -195,6 +196,17 @@ func DeepCopy_v1_Affinity(in Affinity, out *Affinity, c *conversion.Cloner) erro
 	} else {
 		out.NodeAffinity = nil
 	}
+	return nil
+}
+
+func DeepCopy_v1_AzureDiskVolumeSource(in AzureDiskVolumeSource, out *AzureDiskVolumeSource, c *conversion.Cloner) error {
+	out.SecretName = in.SecretName
+	out.DiskName = in.DiskName
+	out.DataDiskURI = in.DataDiskURI
+	out.CachingMode = in.CachingMode
+	out.Partition = in.Partition
+	out.FSType = in.FSType
+	out.ReadOnly = in.ReadOnly
 	return nil
 }
 
@@ -1812,6 +1824,15 @@ func DeepCopy_v1_PersistentVolumeSource(in PersistentVolumeSource, out *Persiste
 	} else {
 		out.AzureFile = nil
 	}
+	if in.AzureDisk != nil {
+		in, out := in.AzureDisk, &out.AzureDisk
+		*out = new(AzureDiskVolumeSource)
+		if err := DeepCopy_v1_AzureDiskVolumeSource(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.AzureDisk = nil
+	}
 	return nil
 }
 
@@ -2961,6 +2982,15 @@ func DeepCopy_v1_VolumeSource(in VolumeSource, out *VolumeSource, c *conversion.
 		}
 	} else {
 		out.ConfigMap = nil
+	}
+	if in.AzureDisk != nil {
+		in, out := in.AzureDisk, &out.AzureDisk
+		*out = new(AzureDiskVolumeSource)
+		if err := DeepCopy_v1_AzureDiskVolumeSource(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.AzureDisk = nil
 	}
 	return nil
 }

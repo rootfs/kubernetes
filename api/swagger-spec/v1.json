@@ -16303,6 +16303,10 @@
       "$ref": "v1.AzureFileVolumeSource",
       "description": "AzureFile represents an Azure File Service mount on the host and bind mount to the pod."
      },
+     "azureDisk": {
+      "$ref": "v1.AzureDiskVolumeSource",
+      "description": "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod."
+     },
      "accessModes": {
       "type": "array",
       "items": {
@@ -16675,6 +16679,46 @@
      }
     }
    },
+   "v1.AzureDiskVolumeSource": {
+    "id": "v1.AzureDiskVolumeSource",
+    "description": "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.",
+    "required": [
+     "secretName",
+     "diskName",
+     "diskURI"
+    ],
+    "properties": {
+     "secretName": {
+      "type": "string",
+      "description": "the name of secret that contains Azure Client ID, Client Secret, Subscription ID, and Azure Resource Group (ARM) name"
+     },
+     "diskName": {
+      "type": "string",
+      "description": "Data Disk Name"
+     },
+     "diskURI": {
+      "type": "string",
+      "description": "Data Disk URI"
+     },
+     "cachingMode": {
+      "type": "string",
+      "description": "Host Caching mode: None, Read Only, Read Write."
+     },
+     "partition": {
+      "type": "integer",
+      "format": "int32",
+      "description": "The partition in the volume to mount. If omitted, the default is to mount by volume name."
+     },
+     "fsType": {
+      "type": "string",
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified."
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts."
+     }
+    }
+   },
    "v1.PersistentVolumeStatus": {
     "id": "v1.PersistentVolumeStatus",
     "description": "PersistentVolumeStatus is the current status of a persistent volume.",
@@ -16921,6 +16965,10 @@
      "configMap": {
       "$ref": "v1.ConfigMapVolumeSource",
       "description": "ConfigMap represents a configMap that should populate this volume"
+     },
+     "azureDisk": {
+      "$ref": "v1.AzureDiskVolumeSource",
+      "description": "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod."
      }
     }
    },

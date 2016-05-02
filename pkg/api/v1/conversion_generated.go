@@ -36,6 +36,8 @@ func init() {
 		Convert_api_AWSElasticBlockStoreVolumeSource_To_v1_AWSElasticBlockStoreVolumeSource,
 		Convert_v1_Affinity_To_api_Affinity,
 		Convert_api_Affinity_To_v1_Affinity,
+		Convert_v1_AzureDiskVolumeSource_To_api_AzureDiskVolumeSource,
+		Convert_api_AzureDiskVolumeSource_To_v1_AzureDiskVolumeSource,
 		Convert_v1_AzureFileVolumeSource_To_api_AzureFileVolumeSource,
 		Convert_api_AzureFileVolumeSource_To_v1_AzureFileVolumeSource,
 		Convert_v1_Binding_To_api_Binding,
@@ -384,6 +386,42 @@ func autoConvert_api_Affinity_To_v1_Affinity(in *api.Affinity, out *Affinity, s 
 
 func Convert_api_Affinity_To_v1_Affinity(in *api.Affinity, out *Affinity, s conversion.Scope) error {
 	return autoConvert_api_Affinity_To_v1_Affinity(in, out, s)
+}
+
+func autoConvert_v1_AzureDiskVolumeSource_To_api_AzureDiskVolumeSource(in *AzureDiskVolumeSource, out *api.AzureDiskVolumeSource, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*AzureDiskVolumeSource))(in)
+	}
+	out.SecretName = in.SecretName
+	out.DiskName = in.DiskName
+	out.DataDiskURI = in.DataDiskURI
+	out.CachingMode = api.AzureDataDiskCachingMode(in.CachingMode)
+	out.Partition = in.Partition
+	out.FSType = in.FSType
+	out.ReadOnly = in.ReadOnly
+	return nil
+}
+
+func Convert_v1_AzureDiskVolumeSource_To_api_AzureDiskVolumeSource(in *AzureDiskVolumeSource, out *api.AzureDiskVolumeSource, s conversion.Scope) error {
+	return autoConvert_v1_AzureDiskVolumeSource_To_api_AzureDiskVolumeSource(in, out, s)
+}
+
+func autoConvert_api_AzureDiskVolumeSource_To_v1_AzureDiskVolumeSource(in *api.AzureDiskVolumeSource, out *AzureDiskVolumeSource, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.AzureDiskVolumeSource))(in)
+	}
+	out.SecretName = in.SecretName
+	out.DiskName = in.DiskName
+	out.DataDiskURI = in.DataDiskURI
+	out.CachingMode = AzureDataDiskCachingMode(in.CachingMode)
+	out.Partition = in.Partition
+	out.FSType = in.FSType
+	out.ReadOnly = in.ReadOnly
+	return nil
+}
+
+func Convert_api_AzureDiskVolumeSource_To_v1_AzureDiskVolumeSource(in *api.AzureDiskVolumeSource, out *AzureDiskVolumeSource, s conversion.Scope) error {
+	return autoConvert_api_AzureDiskVolumeSource_To_v1_AzureDiskVolumeSource(in, out, s)
 }
 
 func autoConvert_v1_AzureFileVolumeSource_To_api_AzureFileVolumeSource(in *AzureFileVolumeSource, out *api.AzureFileVolumeSource, s conversion.Scope) error {
@@ -4645,6 +4683,15 @@ func autoConvert_v1_PersistentVolumeSource_To_api_PersistentVolumeSource(in *Per
 	} else {
 		out.AzureFile = nil
 	}
+	if in.AzureDisk != nil {
+		in, out := &in.AzureDisk, &out.AzureDisk
+		*out = new(api.AzureDiskVolumeSource)
+		if err := Convert_v1_AzureDiskVolumeSource_To_api_AzureDiskVolumeSource(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.AzureDisk = nil
+	}
 	return nil
 }
 
@@ -4772,6 +4819,15 @@ func autoConvert_api_PersistentVolumeSource_To_v1_PersistentVolumeSource(in *api
 		}
 	} else {
 		out.AzureFile = nil
+	}
+	if in.AzureDisk != nil {
+		in, out := &in.AzureDisk, &out.AzureDisk
+		*out = new(AzureDiskVolumeSource)
+		if err := Convert_api_AzureDiskVolumeSource_To_v1_AzureDiskVolumeSource(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.AzureDisk = nil
 	}
 	return nil
 }
@@ -7253,6 +7309,15 @@ func autoConvert_v1_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *api.
 	} else {
 		out.ConfigMap = nil
 	}
+	if in.AzureDisk != nil {
+		in, out := &in.AzureDisk, &out.AzureDisk
+		*out = new(api.AzureDiskVolumeSource)
+		if err := Convert_v1_AzureDiskVolumeSource_To_api_AzureDiskVolumeSource(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.AzureDisk = nil
+	}
 	return nil
 }
 
@@ -7434,6 +7499,15 @@ func autoConvert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *
 		}
 	} else {
 		out.ConfigMap = nil
+	}
+	if in.AzureDisk != nil {
+		in, out := &in.AzureDisk, &out.AzureDisk
+		*out = new(AzureDiskVolumeSource)
+		if err := Convert_api_AzureDiskVolumeSource_To_v1_AzureDiskVolumeSource(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.AzureDisk = nil
 	}
 	return nil
 }
