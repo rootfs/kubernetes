@@ -826,7 +826,7 @@ const (
 
 // AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
 type AzureDiskVolumeSource struct {
-	// the name of secret that contains Azure Client ID, Client Secret, Subscription ID, and Azure Resource Group (ARM) name
+	// the name of secret that contains Azure Client ID, Client Secret, Subscription ID, tenant ID, and Azure Resource Group (ARM) name
 	SecretName string `json:"secretName" protobuf:"bytes,1,opt,name=secretName"`
 	// Data Disk Name
 	DiskName string `json:"diskName" protobuf:"bytes,2,opt,name=diskName"`
