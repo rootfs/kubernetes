@@ -24,9 +24,6 @@ import (
 	"strconv"
 	"strings"
 
-	azcompute "github.com/Azure/azure-sdk-for-go/arm/compute"
-	azhelpers "github.com/Azure/azure-sdk-for-go/arm/examples/helpers"
-	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
