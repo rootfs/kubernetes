@@ -19,8 +19,7 @@ package azure_file
 import (
 	"fmt"
 
-	azcompute "github.com/Azure/azure-sdk-for-go/arm/compute"
-	azhelpers "github.com/Azure/azure-sdk-for-go/arm/examples/helpers"
+	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -28,7 +27,7 @@ import (
 // Abstract interface to azure client operations.
 type azureUtil interface {
 	GetAzureCredentials(host volume.VolumeHost, nameSpace, secretName string) (map[string]string, error)
-	GetAzurePrincipalToken(map[string]string, string)(*azure.ServicePrincipalToken, err)
+	GetAzureVMClient(map[string]string)(*compute.NewVirtualMachinesClient, err)
 }
 
 type azureSvc struct{}
@@ -74,10 +73,16 @@ func (s *azureSvc) GetAzureCredentials(host volume.VolumeHost, nameSpace, secret
 	return m, nil
 }
 
-func (s *azureSvc) GetAzurePrincipalToken(m map[string]string, scope string)(*azure.ServicePrincipalToken, err){
+func (s *azureSvc) GetAzureVMClient(m map[string]string)(*compute.NewVirtualMachinesClient, err){
 	oauthConfig, err := azure.PublicCloud.OAuthConfigForTenant(c["tenantID"])
 	if err != nil {
 		return nil, err
 	}
-	return azure.NewServicePrincipalToken(*oauthConfig, c["clientID"], c["clientSecret"], scope)
+	token, err := azure.NewServicePrincipalToken(*oauthConfig, c["clientID"], c["clientSecret"], azure.PublicCloud.ServiceManagementEndpoint)
+	if err != nil {
+		return nil, err
+	}
+	client := compute.NewVirtualMachinesClient(cred["subscriptionID"])
+	client.Authorizer = token
+	return client, nil
 }
