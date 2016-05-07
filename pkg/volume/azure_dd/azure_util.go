@@ -26,13 +26,13 @@ import (
 
 // Abstract interface to azure client operations.
 type azureUtil interface {
-	GetAzureCredentials(host volume.VolumeHost, nameSpace, secretName string) (map[string]string, error)
-	GetAzureVMClient(map[string]string)(*compute.NewVirtualMachinesClient, err)
+	GetAzureSecret(host volume.VolumeHost, nameSpace, secretName string) (map[string]string, error)
+	UpdateVMDataDisks(map[string]string, string) err	
 }
 
 type azureSvc struct{}
 
-func (s *azureSvc) GetAzureCredentials(host volume.VolumeHost, nameSpace, secretName string) (map[string]string, error) {
+func (s *azureSvc) GetAzureSecret(host volume.VolumeHost, nameSpace, secretName string) (map[string]string, error) {
 	var clientId, clientSecret, subId, tenantId, resourceGroupName string
 	kubeClient := host.GetKubeClient()
 	if kubeClient == nil {
@@ -73,16 +73,54 @@ func (s *azureSvc) GetAzureCredentials(host volume.VolumeHost, nameSpace, secret
 	return m, nil
 }
 
-func (s *azureSvc) GetAzureVMClient(m map[string]string)(*compute.NewVirtualMachinesClient, err){
+func (s *azureSvc) UpdateVMDataDisks(m map[string]string, vmName string) err{
 	oauthConfig, err := azure.PublicCloud.OAuthConfigForTenant(c["tenantID"])
 	if err != nil {
-		return nil, err
+		return err
 	}
 	token, err := azure.NewServicePrincipalToken(*oauthConfig, c["clientID"], c["clientSecret"], azure.PublicCloud.ServiceManagementEndpoint)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	client := compute.NewVirtualMachinesClient(cred["subscriptionID"])
+	client := compute.NewVirtualMachinesClient(c["subscriptionID"])
 	client.Authorizer = token
-	return client, nil
+	vm, err := client.Get(c["resourceGroup"], vmName)
+	if err != nil {
+		return err
+	}
+	disks := vm.Properties.StorageProfile.DataDisks
+	if attach {
+		disks = append(disks,
+			&compute.DataDisk {
+				Name: &diskName,
+				Vhd: &compute.VirtualHardDisk {
+					URI: &diskUri,
+				}
+				Caching: cachingMode,
+			})
+	} else { // detach
+		d := make([]*compute.DataDisk, len(disks))
+		for _, disk := range disks {
+			if disk  != nil && disk.Lun != nil && *disk.Lun == lun {
+				// found a disk to detach
+				glog.V(2).Infof("detach lun %d", disk.Lun)
+				continue
+			}
+			d = append(d, disk)
+		}
+		disks = d
+	}
+	newVM := compute.VirtualMachine {
+		Location: vm.Location,
+		Properties: &compute.VirtualMachineProperties {
+			StorageProfile: &compute.StorageProfile {
+				DataDisks: &disks
+			},
+		},
+	}
+	_, err := client.CreateOrUpdate(c["resourceGroup"], vmName,
+		newVM, nil)
+	return err
 }
+
+
