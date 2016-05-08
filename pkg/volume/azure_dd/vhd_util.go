@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package fc
+package azure_dd
 
 import (
 	"fmt"
@@ -30,9 +30,7 @@ import (
 
 type ioHandler interface {
 	ReadDir(dirname string) ([]os.FileInfo, error)
-	Lstat(name string) (os.FileInfo, error)
-	EvalSymlinks(path string) (string, error)
-	WriteFile(filename string, data []byte, perm os.FileMode) error
+	ReadFile(filename string)([]byte, error)
 }
 
 type osIOHandler struct{}
@@ -40,27 +38,39 @@ type osIOHandler struct{}
 func (handler *osIOHandler) ReadDir(dirname string) ([]os.FileInfo, error) {
 	return ioutil.ReadDir(dirname)
 }
-func (handler *osIOHandler) Lstat(name string) (os.FileInfo, error) {
-	return os.Lstat(name)
-}
-func (handler *osIOHandler) EvalSymlinks(path string) (string, error) {
-	return filepath.EvalSymlinks(path)
-}
-func (handler *osIOHandler) WriteFile(filename string, data []byte, perm os.FileMode) error {
-	return ioutil.WriteFile(filename, data, perm)
+func (handler *osIOHandler) ReadFile(filename string)([]byte, error) {
+	return ioutil.ReadFile(filename)
 }
 
-// given a disk path like /dev/sdx, find the devicemapper parent
-// TODO #23192 Convert this code to use the generic code in ../util
-// which is used by the iSCSI implementation
-func findMultipathDeviceMapper(disk string, io ioHandler) string {
-	sys_path := "/sys/block/"
+// given a LUN find the VHD device path like /dev/sdb
+func findDiskByLun(lun int, io ioHandler) string {
+	sys_path := "/sys/bus/scsi/devices"
 	if dirs, err := io.ReadDir(sys_path); err == nil {
 		for _, f := range dirs {
 			name := f.Name()
-			if strings.HasPrefix(name, "dm-") {
-				if _, err1 := io.Lstat(sys_path + name + "/slaves/" + disk); err1 == nil {
-					return "/dev/" + name
+			arr := strings.Split(name,":")
+			if len(arr) < 4 {
+				continue
+			}
+			target,err := strconv.Atoi(arr[0])
+			// skip targets 0-2, which are used by OS disks
+			if err == nil && target > 2  {
+				l,err := strconv.Atoi(arr[2])
+				if err == nil && lun == l {
+					// read vendor
+					if vendor, err := io.ReadFile(path.Join(sys_path, name,"vendor")); err == nil {
+						if strings.ToUpper(string(vendor)) == "MSFT" {
+							// read model
+							if model, err := ioutil.ReadFile(path.Join(sys_path, name,"model")); err == nil {
+								if strings.ToUpper(string(vendor)) == "VIRTUAL DISK" {
+									// found it
+									if dev, err := io.ReadDir(path.Join(sys_path, name, "block")); err == nil {
+										return "/dev/" + dev[0].Name()
+									}
+								}
+							}
+						}
+					}				
 				}
 			}
 		}
@@ -68,57 +78,10 @@ func findMultipathDeviceMapper(disk string, io ioHandler) string {
 	return ""
 }
 
-// given a wwn and lun, find the device and associated devicemapper parent
-func findDisk(wwn, lun string, io ioHandler) (string, string) {
-	fc_path := "-fc-0x" + wwn + "-lun-" + lun
-	dev_path := "/dev/disk/by-path/"
-	if dirs, err := io.ReadDir(dev_path); err == nil {
-		for _, f := range dirs {
-			name := f.Name()
-			if strings.Contains(name, fc_path) {
-				if disk, err1 := io.EvalSymlinks(dev_path + name); err1 == nil {
-					arr := strings.Split(disk, "/")
-					l := len(arr) - 1
-					dev := arr[l]
-					dm := findMultipathDeviceMapper(dev, io)
-					return disk, dm
-				}
-			}
-		}
-	}
-	return "", ""
-}
-
-func createMultipathConf(path string, io ioHandler) {
-	if _, err := os.Lstat(path); err != nil {
-		data := []byte(`defaults {
-	find_multipaths yes
-	user_friendly_names yes
-}
 
 
-blacklist {
-}
-`)
-		io.WriteFile(path, data, 0664)
-	}
-}
-
-// rescan scsi bus
-func scsiHostRescan(io ioHandler) {
-	scsi_path := "/sys/class/scsi_host/"
-	if dirs, err := io.ReadDir(scsi_path); err == nil {
-		for _, f := range dirs {
-			name := scsi_path + f.Name() + "/scan"
-			data := []byte("- - -")
-			io.WriteFile(name, data, 0666)
-		}
-	}
-}
-
-// make a directory like /var/lib/kubelet/plugins/kubernetes.io/pod/fc/target-lun-0
-func makePDNameInternal(host volume.VolumeHost, wwns []string, lun string) string {
-	return path.Join(host.GetPluginDir(fcPluginName), wwns[0]+"-lun-"+lun)
+func makePDNameInternal(host volume.VolumeHost, lun string) string {
+	return path.Join(host.GetPluginDir(azurePluginName), "lun-"+lun)
 }
 
 type FCUtil struct{}
@@ -127,68 +90,32 @@ func (util *FCUtil) MakeGlobalPDName(fc fcDisk) string {
 	return makePDNameInternal(fc.plugin.host, fc.wwns, fc.lun)
 }
 
-func searchDisk(wwns []string, lun string, io ioHandler) (string, string) {
-	disk := ""
-	dm := ""
-
-	rescaned := false
-	// two-phase search:
-	// first phase, search existing device path, if a multipath dm is found, exit loop
-	// otherwise, in second phase, rescan scsi bus and search again, return with any findings
-	for true {
-		for _, wwn := range wwns {
-			disk, dm = findDisk(wwn, lun, io)
-			// if multipath device is found, break
-			if dm != "" {
-				break
-			}
-		}
-		// if a dm is found, exit loop
-		if rescaned || dm != "" {
-			break
-		}
-		// rescan and search again
-		// create multipath conf if it is not there
-		createMultipathConf("/etc/multipath.conf", io)
-		// rescan scsi bus
-		scsiHostRescan(io)
-		rescaned = true
-	}
-	return disk, dm
-}
-
-func (util *FCUtil) AttachDisk(b fcDiskMounter) error {
-	devicePath := ""
-	wwns := b.wwns
+func (util *FCUtil) AttachDisk(b azureDiskMounter) error {
 	lun := b.lun
 	io := b.io
-	disk, dm := searchDisk(wwns, lun, io)
-	// if no disk matches input wwn and lun, exit
-	if disk == "" && dm == "" {
-		return fmt.Errorf("no fc disk found")
+	disk := findDiskByLun(lun, io)
+	// if no disk matches input lun, exit
+	if disk == "" {
+		return fmt.Errorf("no vhd disk found")
 	}
-
-	// if multipath devicemapper device is found, use it; otherwise use raw disk
-	if dm != "" {
-		devicePath = dm
-	} else {
-		devicePath = disk
+	if b.parition != "" {
+		disk = disk + b.partition
 	}
 	// mount it
 	globalPDPath := b.manager.MakeGlobalPDName(*b.fcDisk)
 	noMnt, err := b.mounter.IsLikelyNotMountPoint(globalPDPath)
 	if !noMnt {
-		glog.Infof("fc: %s already mounted", globalPDPath)
+		glog.Infof("azure disk: %s already mounted", globalPDPath)
 		return nil
 	}
 
 	if err := os.MkdirAll(globalPDPath, 0750); err != nil {
-		return fmt.Errorf("fc: failed to mkdir %s, error", globalPDPath)
+		return fmt.Errorf("azure disk: failed to mkdir %s, error", globalPDPath)
 	}
 
-	err = b.mounter.FormatAndMount(devicePath, globalPDPath, b.fsType, nil)
+	err = b.mounter.FormatAndMount(disk, globalPDPath, b.fsType, nil)
 	if err != nil {
-		return fmt.Errorf("fc: failed to mount fc volume %s [%s] to %s, error %v", devicePath, b.fsType, globalPDPath, err)
+		return fmt.Errorf("azure disk: failed to mount volume %s [%s] to %s, error %v", devicePath, b.fsType, globalPDPath, err)
 	}
 
 	return err
@@ -196,7 +123,7 @@ func (util *FCUtil) AttachDisk(b fcDiskMounter) error {
 
 func (util *FCUtil) DetachDisk(c fcDiskUnmounter, mntPath string) error {
 	if err := c.mounter.Unmount(mntPath); err != nil {
-		return fmt.Errorf("fc detach disk: failed to unmount: %s\nError: %v", mntPath, err)
+		return fmt.Errorf("azure disk: detach disk: failed to unmount: %s\nError: %v", mntPath, err)
 	}
 	return nil
 }

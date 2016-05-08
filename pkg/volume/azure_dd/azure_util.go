@@ -24,6 +24,20 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 )
 
+// operation and info on Azure Data Disk
+type AzureDataDiskOp struct {
+	// attach (true) or detach (false)
+	attach bool
+	// when detach, use lun to locate data disk
+	lun  int32
+	// disk name
+	name string
+	// vhd uri
+	uri  string
+	// caching type
+	caching compute.CachingTypes
+}
+
 // Abstract interface to azure client operations.
 type azureUtil interface {
 	GetAzureSecret(host volume.VolumeHost, nameSpace, secretName string) (map[string]string, error)
@@ -73,7 +87,7 @@ func (s *azureSvc) GetAzureSecret(host volume.VolumeHost, nameSpace, secretName 
 	return m, nil
 }
 
-func (s *azureSvc) UpdateVMDataDisks(m map[string]string, vmName string) err{
+func (s *azureSvc) UpdateVMDataDisks(c map[string]string, op AzureDataDiskOp, vmName string) err{
 	oauthConfig, err := azure.PublicCloud.OAuthConfigForTenant(c["tenantID"])
 	if err != nil {
 		return err
@@ -89,21 +103,21 @@ func (s *azureSvc) UpdateVMDataDisks(m map[string]string, vmName string) err{
 		return err
 	}
 	disks := vm.Properties.StorageProfile.DataDisks
-	if attach {
+	if op.attach {
 		disks = append(disks,
 			&compute.DataDisk {
-				Name: &diskName,
+				Name: &op.name,
 				Vhd: &compute.VirtualHardDisk {
-					URI: &diskUri,
+					URI: &op.uri,
 				}
-				Caching: cachingMode,
+				Caching: op.caching,
 			})
 	} else { // detach
 		d := make([]*compute.DataDisk, len(disks))
-		for _, disk := range disks {
-			if disk  != nil && disk.Lun != nil && *disk.Lun == lun {
+		for _, disk := range *disks {
+			if disk  != nil && disk.Lun != nil && *disk.Lun == op.lun {
 				// found a disk to detach
-				glog.V(2).Infof("detach lun %d", disk.Lun)
+				glog.V(2).Infof("detach disk %#v", *disk)
 				continue
 			}
 			d = append(d, disk)
@@ -118,8 +132,9 @@ func (s *azureSvc) UpdateVMDataDisks(m map[string]string, vmName string) err{
 			},
 		},
 	}
-	_, err := client.CreateOrUpdate(c["resourceGroup"], vmName,
+	res, err := client.CreateOrUpdate(c["resourceGroup"], vmName,
 		newVM, nil)
+	glog.V(2).Info("azure VM CreateOrUpdate result:%#v",res)
 	return err
 }
 
