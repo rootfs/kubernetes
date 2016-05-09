@@ -54,55 +54,57 @@ func findDiskByLun(lun int, io ioHandler) string {
 			}
 			target,err := strconv.Atoi(arr[0])
 			// skip targets 0-2, which are used by OS disks
-			if err == nil && target > 2  {
-				l,err := strconv.Atoi(arr[2])
-				if err == nil && lun == l {
-					// read vendor
-					if vendor, err := io.ReadFile(path.Join(sys_path, name,"vendor")); err == nil {
-						if strings.ToUpper(string(vendor)) == "MSFT" {
-							// read model
-							if model, err := ioutil.ReadFile(path.Join(sys_path, name,"model")); err == nil {
-								if strings.ToUpper(string(vendor)) == "VIRTUAL DISK" {
-									// found it
-									if dev, err := io.ReadDir(path.Join(sys_path, name, "block")); err == nil {
-										return "/dev/" + dev[0].Name()
-									}
-								}
-							}
-						}
-					}				
+			if err != nil || target <= 2  {
+				continue
+			}
+			l,err := strconv.Atoi(arr[2])
+			if err != nil || lun != l {
+				continue
+			}
+			// read vendor
+			if vendor, err := io.ReadFile(path.Join(sys_path, name,"vendor")); err == nil {
+				if strings.ToUpper(string(vendor)) != "MSFT" {
+					continue
+				}				
+				// read model
+				if model, err := io.ReadFile(path.Join(sys_path, name,"model")); err == nil {
+					if strings.ToUpper(string(vendor)) != "VIRTUAL DISK" {
+						continue
+					}
+					// found it
+					if dev, err := io.ReadDir(path.Join(sys_path, name, "block")); err == nil {
+						return "/dev/" + dev[0].Name()
+					}
 				}
 			}
-		}
+		}		
 	}
 	return ""
 }
-
-
 
 func makePDNameInternal(host volume.VolumeHost, lun string) string {
 	return path.Join(host.GetPluginDir(azurePluginName), "lun-"+lun)
 }
 
-type FCUtil struct{}
+type AzureUtil struct{}
 
-func (util *FCUtil) MakeGlobalPDName(fc fcDisk) string {
-	return makePDNameInternal(fc.plugin.host, fc.wwns, fc.lun)
+func (util *AzureUtil) MakeGlobalPDName(d azureDisk) string {
+	return makePDNameInternal(d.plugin.host, d.lun)
 }
 
-func (util *FCUtil) AttachDisk(b azureDiskMounter) error {
+func (util *AzureUtil) AttachDisk(b azureDiskMounter) error {
 	lun := b.lun
 	io := b.io
 	disk := findDiskByLun(lun, io)
 	// if no disk matches input lun, exit
 	if disk == "" {
-		return fmt.Errorf("no vhd disk found")
+		return fmt.Errorf("no data disk found")
 	}
 	if b.parition != "" {
 		disk = disk + b.partition
 	}
 	// mount it
-	globalPDPath := b.manager.MakeGlobalPDName(*b.fcDisk)
+	globalPDPath := b.manager.MakeGlobalPDName(*b.azureDisk)
 	noMnt, err := b.mounter.IsLikelyNotMountPoint(globalPDPath)
 	if !noMnt {
 		glog.Infof("azure disk: %s already mounted", globalPDPath)
@@ -121,7 +123,7 @@ func (util *FCUtil) AttachDisk(b azureDiskMounter) error {
 	return err
 }
 
-func (util *FCUtil) DetachDisk(c fcDiskUnmounter, mntPath string) error {
+func (util *AzureUtil) DetachDisk(c azureDiskUnmounter, mntPath string) error {
 	if err := c.mounter.Unmount(mntPath); err != nil {
 		return fmt.Errorf("azure disk: detach disk: failed to unmount: %s\nError: %v", mntPath, err)
 	}
