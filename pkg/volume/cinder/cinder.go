@@ -25,6 +25,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/rackspace"
 	"k8s.io/kubernetes/pkg/types"
@@ -42,11 +43,12 @@ func ProbeVolumePlugins() []volume.VolumePlugin {
 
 type CinderProvider interface {
 	AttachDisk(instanceID string, diskName string) (string, error)
-	DetachDisk(instanceID string, partialDiskId string) error
+	DetachDisk(instanceID string, partialDiskId string) error	
 	DeleteVolume(volumeName string) error
 	CreateVolume(name string, size int, tags *map[string]string) (volumeName string, err error)
 	GetDevicePath(diskId string) string
 	InstanceID() (string, error)
+	GetAttachmentDiskPath(instanceID string, diskName string) (string, error)
 }
 
 type cinderPlugin struct {
@@ -163,6 +165,16 @@ func (plugin *cinderPlugin) newProvisionerInternal(options volume.VolumeOptions,
 	}, nil
 }
 
+func getCloudProvider(cloudProvider cloudprovider.Interface) (CinderProvider, error) {
+	if cloud, ok := cloudProvider.(*rackspace.Rackspace); ok && cloud != nil {
+		return cloud,  nil
+	}
+	if cloud, ok := cloudProvider.(*openstack.OpenStack); ok && cloud != nil {
+		return cloud,  nil
+	}
+	return nil, fmt.Errorf("wrong cloud type")
+}
+
 func (plugin *cinderPlugin) getCloudProvider() (CinderProvider, error) {
 	cloud := plugin.host.GetCloudProvider()
 	if cloud == nil {
@@ -182,10 +194,10 @@ func (plugin *cinderPlugin) getCloudProvider() (CinderProvider, error) {
 
 // Abstract interface to PD operations.
 type cdManager interface {
-	// Attaches the disk to the kubelet's host machine.
-	AttachDisk(mounter *cinderVolumeMounter, globalPDPath string) error
-	// Detaches the disk from the kubelet's host machine.
-	DetachDisk(unmounter *cinderVolumeUnmounter) error
+    // Attaches the disk to the kubelet's host machine.
+    AttachDisk(mounter *cinderVolumeMounter, globalPDPath string) error
+    // Detaches the disk from the kubelet's host machine.
+    DetachDisk(unmounter *cinderVolumeUnmounter) error
 	// Creates a volume
 	CreateVolume(provisioner *cinderVolumeProvisioner) (volumeID string, volumeSizeGB int, err error)
 	// Deletes a volume
