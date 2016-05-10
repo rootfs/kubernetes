@@ -36,6 +36,7 @@ type persistentClaimPlugin struct {
 }
 
 var _ volume.VolumePlugin = &persistentClaimPlugin{}
+var _ volume.AttachableVolumePlugin = &persistentClaimPlugin{}
 
 const (
 	persistentClaimPluginName = "kubernetes.io/persistent-claim"
@@ -55,30 +56,39 @@ func (plugin *persistentClaimPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.PersistentVolumeClaim != nil
 }
 
-func (plugin *persistentClaimPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+func (plugin *persistentClaimPlugin) getPersistentVolumeBySpec(spec *volume.Spec, pod *api.Pod) (*api.PersistentVolumeClaim, *api.PersistentVolume, error) {
 	claim, err := plugin.host.GetKubeClient().Core().PersistentVolumeClaims(pod.Namespace).Get(spec.Volume.PersistentVolumeClaim.ClaimName)
 	if err != nil {
 		glog.Errorf("Error finding claim: %+v\n", spec.Volume.PersistentVolumeClaim.ClaimName)
-		return nil, err
+		return nil, nil, err
 	}
 
 	if claim.Spec.VolumeName == "" {
-		return nil, fmt.Errorf("The claim %+v is not yet bound to a volume", claim.Name)
+		return nil, nil, fmt.Errorf("The claim %+v is not yet bound to a volume", claim.Name)
 	}
 
 	pv, err := plugin.host.GetKubeClient().Core().PersistentVolumes().Get(claim.Spec.VolumeName)
 	if err != nil {
 		glog.Errorf("Error finding persistent volume for claim: %+v\n", claim.Name)
-		return nil, err
+		return nil, nil, err
 	}
 
 	if pv.Spec.ClaimRef == nil {
 		glog.Errorf("The volume is not yet bound to the claim. Expected to find the bind on volume.Spec.ClaimRef: %+v", pv)
-		return nil, err
+		return nil, nil, err
 	}
 
 	if pv.Spec.ClaimRef.UID != claim.UID {
 		glog.Errorf("Expected volume.Spec.ClaimRef.UID %+v but have %+v", pv.Spec.ClaimRef.UID, claim.UID)
+		return nil, nil, err
+	}
+
+	return claim, pv, nil
+}
+
+func (plugin *persistentClaimPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+	claim, pv, err := plugin.getPersistentVolumeBySpec(spec, pod)
+	if err != nil || pv == nil {
 		return nil, err
 	}
 
@@ -106,4 +116,17 @@ func (plugin *persistentClaimPlugin) NewMounter(spec *volume.Spec, pod *api.Pod,
 
 func (plugin *persistentClaimPlugin) NewUnmounter(_ string, _ types.UID) (volume.Unmounter, error) {
 	return nil, fmt.Errorf("This will never be called directly. The PV backing this claim has a unmounter.  Kubelet uses that unmounter, not this one, when removing orphaned volumes.")
+}
+
+func (plugin *persistentClaimPlugin) NewAttacher(spec *volume.Spec, pod *api.Pod) (volume.Attacher, error) {
+	claim, pv, err := plugin.getPersistentVolumeBySpec(spec, pod)
+	if err != nil || pv == nil {
+		return nil, err
+	}
+
+	return plugin.host.NewWrapperAttacher(claim.Spec.VolumeName, *volume.NewSpecFromPersistentVolume(pv, spec.ReadOnly), pod)
+}
+
+func (plugin *persistentClaimPlugin) NewDetacher() (volume.Detacher, error) {
+	return nil, fmt.Errorf("This will never be called directly. The kubelet should use the Detacher of the underlying PV.")
 }

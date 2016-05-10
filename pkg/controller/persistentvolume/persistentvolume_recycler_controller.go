@@ -394,6 +394,10 @@ func (f *PersistentVolumeRecycler) NewWrapperMounter(volName string, spec volume
 	return nil, fmt.Errorf("NewWrapperMounter not supported by PVClaimBinder's VolumeHost implementation")
 }
 
+func (c *PersistentVolumeRecycler) NewWrapperAttacher(volName string, spec volume.Spec, pod *api.Pod) (volume.Attacher, error) {
+	return nil, fmt.Errorf("NewWrapperAttacher not supported by PV Recycler VolumeHost implementation")
+}
+
 func (f *PersistentVolumeRecycler) NewWrapperUnmounter(volName string, spec volume.Spec, podUID types.UID) (volume.Unmounter, error) {
 	return nil, fmt.Errorf("NewWrapperUnmounter not supported by PVClaimBinder's VolumeHost implementation")
 }

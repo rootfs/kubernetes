@@ -132,22 +132,22 @@ type Deleter interface {
 // Attacher can attach a volume to a node.
 type Attacher interface {
 	// Attach the volume specified by the given spec to the given host
-	Attach(spec *Spec, hostName string) error
+	Attach(hostName string, mounter mount.Interface) error
 
 	// WaitForAttach blocks until the device is attached to this
 	// node. If it successfully attaches, the path to the device
 	// is returned. Otherwise, if the device does not attach after
 	// the given timeout period, an error will be returned.
-	WaitForAttach(spec *Spec, timeout time.Duration) (string, error)
+	WaitForAttach(timeout time.Duration) (string, error)
 
 	// GetDeviceMountPath returns a path where the device should
 	// be mounted after it is attached. This is a global mount
 	// point which should be bind mounted for individual volumes.
-	GetDeviceMountPath(host VolumeHost, spec *Spec) string
+	GetDeviceMountPath() string
 
 	// MountDevice mounts the disk to a global path which
 	// individual pods can then bind mount
-	MountDevice(spec *Spec, devicePath string, deviceMountPath string, mounter mount.Interface) error
+	MountDevice(devicePath string, deviceMountPath string, mounter mount.Interface) error
 }
 
 // Detacher can detach a volume from a node.

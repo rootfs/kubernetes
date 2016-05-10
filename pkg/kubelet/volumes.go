@@ -69,6 +69,16 @@ func (vh *volumeHost) NewWrapperMounter(volName string, spec volume.Spec, pod *a
 	return vh.kubelet.newVolumeMounterFromPlugins(&spec, pod, opts)
 }
 
+func (vh *volumeHost) NewWrapperAttacher(volName string, spec volume.Spec, pod *api.Pod) (volume.Attacher, error) {
+	// The name of wrapper volume is set to "wrapped_{wrapped_volume_name}"
+	wrapperVolumeName := "wrapped_" + volName
+	if spec.Volume != nil {
+		spec.Volume.Name = wrapperVolumeName
+	}
+
+	return vh.kubelet.newVolumeAttacherFromPlugins(&spec, pod)
+}
+
 // NewWrapperUnmounter attempts to create a volume unmounter
 // from a volume name and pod uid.
 // Returns a new volume Unmounter or an error.
@@ -137,24 +147,24 @@ func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, 
 		// some volumes require attachment before mounter's setup.
 		// The plugin can be nil, but non-nil errors are legitimate errors.
 		// For non-nil plugins, Attachment to a node is required before Mounter's setup.
-		attacher, err := kl.newVolumeAttacherFromPlugins(volSpec, pod, volume.VolumeOptions{RootContext: rootContext})
+		attacher, err := kl.newVolumeAttacherFromPlugins(volSpec, pod)
 		if err != nil {
 			glog.Errorf("Could not create volume attacher for pod %s: %v", pod.UID, err)
 			return nil, err
 		}
 		if attacher != nil {
-			err = attacher.Attach(volSpec, kl.hostname)
+			err = attacher.Attach(kl.hostname, kl.mounter)
 			if err != nil {
 				return nil, err
 			}
 
-			devicePath, err := attacher.WaitForAttach(volSpec, maxWaitForVolumeOps)
+			devicePath, err := attacher.WaitForAttach(maxWaitForVolumeOps)
 			if err != nil {
 				return nil, err
 			}
 
-			deviceMountPath := attacher.GetDeviceMountPath(&volumeHost{kl}, volSpec)
-			if err = attacher.MountDevice(volSpec, devicePath, deviceMountPath, kl.mounter); err != nil {
+			deviceMountPath := attacher.GetDeviceMountPath()
+			if err = attacher.MountDevice(devicePath, deviceMountPath, kl.mounter); err != nil {
 				return nil, err
 			}
 		}
@@ -293,7 +303,7 @@ func (kl *Kubelet) newVolumeMounterFromPlugins(spec *volume.Spec, pod *api.Pod, 
 //  - an error if no plugin was found for the volume
 //    or the attacher failed to instantiate
 //  - nil if there is no appropriate attacher for this volume
-func (kl *Kubelet) newVolumeAttacherFromPlugins(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Attacher, error) {
+func (kl *Kubelet) newVolumeAttacherFromPlugins(spec *volume.Spec, pod *api.Pod) (volume.Attacher, error) {
 	plugin, err := kl.volumePluginMgr.FindAttachablePluginBySpec(spec)
 	if err != nil {
 		return nil, fmt.Errorf("can't use volume plugins for %s: %v", spec.Name(), err)
@@ -303,7 +313,7 @@ func (kl *Kubelet) newVolumeAttacherFromPlugins(spec *volume.Spec, pod *api.Pod,
 		return nil, nil
 	}
 
-	attacher, err := plugin.NewAttacher()
+	attacher, err := plugin.NewAttacher(spec, pod)
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate volume attacher for %s: %v", spec.Name(), err)
 	}

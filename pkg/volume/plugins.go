@@ -131,7 +131,7 @@ type ProvisionableVolumePlugin interface {
 // to a node before mounting.
 type AttachableVolumePlugin interface {
 	VolumePlugin
-	NewAttacher() (Attacher, error)
+	NewAttacher(spec *Spec, pod *api.Pod) (Attacher, error)
 	NewDetacher() (Detacher, error)
 }
 
@@ -163,6 +163,11 @@ type VolumeHost interface {
 	// "wrap" other plugins.  For example, the "secret" volume is
 	// implemented in terms of the "emptyDir" volume.
 	NewWrapperMounter(volName string, spec Spec, pod *api.Pod, opts VolumeOptions) (Mounter, error)
+
+	// NewWrapperAttacher creats an Attacher which wraps one belonging to
+	// another volume. This is used to create Attachers for plugins which
+	// wrap other plugins such as the persistentClaimPlugin
+	NewWrapperAttacher(volName string, spec Spec, pod *api.Pod) (Attacher, error)
 
 	// NewWrapperUnmounter finds an appropriate plugin with which to handle
 	// the provided spec.  See comments on NewWrapperMounter for more

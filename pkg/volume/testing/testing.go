@@ -109,6 +109,10 @@ func (f *fakeVolumeHost) NewWrapperUnmounter(volName string, spec Spec, podUID t
 	return plug.NewUnmounter(spec.Name(), podUID)
 }
 
+func (f *fakeVolumeHost) NewWrapperAttacher(volName string, spec Spec, pod *api.Pod) (Attacher, error) {
+	return nil, nil
+}
+
 // Returns the hostname of the host kubelet is running on
 func (f *fakeVolumeHost) GetHostName() string {
 	return "fakeHostName"
@@ -189,7 +193,7 @@ func (plugin *FakeVolumePlugin) NewUnmounter(volName string, podUID types.UID) (
 	return volume, nil
 }
 
-func (plugin *FakeVolumePlugin) NewAttacher() (Attacher, error) {
+func (plugin *FakeVolumePlugin) NewAttacher(spec *Spec, pod *api.Pod) (Attacher, error) {
 	plugin.NewAttacherCallCount = plugin.NewAttacherCallCount + 1
 	return plugin.getFakeVolume(&plugin.Attachers), nil
 }
@@ -263,22 +267,22 @@ func (fv *FakeVolume) TearDownAt(dir string) error {
 	return os.RemoveAll(dir)
 }
 
-func (fv *FakeVolume) Attach(spec *Spec, hostName string) error {
+func (fv *FakeVolume) Attach(hostName string, mounter mount.Interface) error {
 	fv.AttachCallCount++
 	return nil
 }
 
-func (fv *FakeVolume) WaitForAttach(spec *Spec, spectimeout time.Duration) (string, error) {
+func (fv *FakeVolume) WaitForAttach(spectimeout time.Duration) (string, error) {
 	fv.WaitForAttachCallCount++
 	return "", nil
 }
 
-func (fv *FakeVolume) GetDeviceMountPath(host VolumeHost, spec *Spec) string {
+func (fv *FakeVolume) GetDeviceMountPath() string {
 	fv.GetDeviceMountPathCallCount++
 	return ""
 }
 
-func (fv *FakeVolume) MountDevice(spec *Spec, devicePath string, deviceMountPath string, mounter mount.Interface) error {
+func (fv *FakeVolume) MountDevice(devicePath string, deviceMountPath string, mounter mount.Interface) error {
 	fv.MountDeviceCallCount++
 	return nil
 }
