@@ -25,6 +25,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/rackspace"
 	"k8s.io/kubernetes/pkg/types"
@@ -47,6 +48,7 @@ type CinderProvider interface {
 	CreateVolume(name string, size int, tags *map[string]string) (volumeName string, err error)
 	GetDevicePath(diskId string) string
 	InstanceID() (string, error)
+	GetAttachmentDiskPath(instanceID string, diskName string) (string, error)
 }
 
 type cinderPlugin struct {
@@ -161,6 +163,16 @@ func (plugin *cinderPlugin) newProvisionerInternal(options volume.VolumeOptions,
 		},
 		options: options,
 	}, nil
+}
+
+func getCloudProvider(cloudProvider cloudprovider.Interface) (CinderProvider, error) {
+	if cloud, ok := cloudProvider.(*rackspace.Rackspace); ok && cloud != nil {
+		return cloud, nil
+	}
+	if cloud, ok := cloudProvider.(*openstack.OpenStack); ok && cloud != nil {
+		return cloud, nil
+	}
+	return nil, fmt.Errorf("wrong cloud type")
 }
 
 func (plugin *cinderPlugin) getCloudProvider() (CinderProvider, error) {
