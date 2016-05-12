@@ -32,7 +32,8 @@ import (
 )
 
 type awsElasticBlockStoreAttacher struct{
-	devicePath string
+	host volume.VolumeHost
+	spec *volume.Spec
 }
 
 var _ volume.Attacher = &awsElasticBlockStoreAttacher{}
@@ -42,55 +43,57 @@ var _ volume.AttachableVolumePlugin = &awsElasticBlockStorePlugin{}
 // Singleton key mutex for keeping attach/detach operations for the same PD atomic
 var attachDetachMutex = keymutex.NewKeyMutex()
 
-func (plugin *awsElasticBlockStorePlugin) NewAttacher() (volume.Attacher, error) {
-	return &awsElasticBlockStoreAttacher{devicePath: ""}, nil
+func (plugin *awsElasticBlockStorePlugin) NewAttacher(spec *volume.Spec, pod *api.Pod) (volume.Attacher, error) {
+	return &awsElasticBlockStoreAttacher{host: plugin.host,
+		spec: spec,
+	}, nil
 }
 
-func (attacher *awsElasticBlockStoreAttacher) Attach(host volume.VolumeHost, spec *volume.Spec, hostName string) error {
-	volumeSource, readOnly := getVolumeSource(spec)
+func (attacher *awsElasticBlockStoreAttacher) Attach(hostName string, mounter mount.Interface) error {
+	volumeSource, readOnly := getVolumeSource(attacher.spec)
 	VolumeID := volumeSource.VolumeID
 
 	// Block execution until any pending detach operations for this PD have completed
 	attachDetachMutex.LockKey(VolumeID)
 	defer attachDetachMutex.UnlockKey(VolumeID)
 
-	awsCloud, err := getCloudProvider(host.GetCloudProvider())
+	awsCloud, err := getCloudProvider(attacher.host.GetCloudProvider())
 	if err != nil {
 		return err
 	}
 
 	for numRetries := 0; numRetries < maxRetries; numRetries++ {
-		var dev string
 		if numRetries > 0 {
 			glog.Warningf("Retrying attach for AWS PD %q (retry count=%v).", VolumeID, numRetries)
 		}
 
-		if dev, err = awsCloud.AttachDisk(VolumeID, hostName, readOnly); err != nil {
+		if _, err = awsCloud.AttachDisk(VolumeID, hostName, readOnly); err != nil {
 			glog.Errorf("Error attaching PD %q: %+v", VolumeID, err)
 			time.Sleep(errorSleepDuration)
 			continue
 		}
-		attacher.devicePath = dev
 		return nil
 	}
 
 	return err
 }
 
-func (attacher *awsElasticBlockStoreAttacher) WaitForAttach(spec *volume.Spec, timeout time.Duration) (string, error) {
+func (attacher *awsElasticBlockStoreAttacher) WaitForAttach(timeout time.Duration) (string, error) {
 	ticker := time.NewTicker(checkSleepDuration)
 	defer ticker.Stop()
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 
-	volumeSource, _ := getVolumeSource(spec)
+	volumeSource, _ := getVolumeSource(attacher.spec)
 	VolumeID := volumeSource.VolumeID
 	partition := ""
 	if volumeSource.Partition != 0 {
 		partition = strconv.Itoa(int(volumeSource.Partition))
 	}
 
-	devicePaths := getDiskByIdPaths(partition, attacher.devicePath)
+	// FIXME: call aws DescribeVolume to retrieve device path
+	devicePath := ""
+	devicePaths := getDiskByIdPaths(partition, devicePath)
 	for {
 		select {
 		case <-ticker.C:
@@ -110,13 +113,13 @@ func (attacher *awsElasticBlockStoreAttacher) WaitForAttach(spec *volume.Spec, t
 	}
 }
 
-func (attacher *awsElasticBlockStoreAttacher) GetDeviceMountPath(host volume.VolumeHost, spec *volume.Spec) string {
-	volumeSource, _ := getVolumeSource(spec)
-	return makeGlobalPDPath(host, volumeSource.VolumeID)
+func (attacher *awsElasticBlockStoreAttacher) GetDeviceMountPath() string {
+	volumeSource, _ := getVolumeSource(attacher.spec)
+	return makeGlobalPDPath(attacher.host, volumeSource.VolumeID)
 }
 
-func (attacher *awsElasticBlockStoreAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string, mounter mount.Interface) error {
-	// Only mount the PD globally once.
+// FIXME: this method can be further pruned.
+func (attacher *awsElasticBlockStoreAttacher) MountDevice(devicePath string, deviceMountPath string, mounter mount.Interface) error {
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -129,7 +132,7 @@ func (attacher *awsElasticBlockStoreAttacher) MountDevice(spec *volume.Spec, dev
 		}
 	}
 
-	volumeSource, readOnly := getVolumeSource(spec)
+	volumeSource, readOnly := getVolumeSource(attacher.spec)
 
 	options := []string{}
 	if readOnly {
@@ -147,24 +150,23 @@ func (attacher *awsElasticBlockStoreAttacher) MountDevice(spec *volume.Spec, dev
 }
 
 type awsElasticBlockStoreDetacher struct{
-	devicePath string
+	host volume.VolumeHost
 }
 
 var _ volume.Detacher = &awsElasticBlockStoreDetacher{}
 
 func (plugin *awsElasticBlockStorePlugin) NewDetacher() (volume.Detacher, error) {
-	return &awsElasticBlockStoreDetacher{devicePath: ""}, nil
+	return &awsElasticBlockStoreDetacher{host: plugin.host}, nil
 }
 
-func (detacher *awsElasticBlockStoreDetacher) Detach(host volume.VolumeHost, deviceMountPath string, hostName string) error {
-	dev := ""
+func (detacher *awsElasticBlockStoreDetacher) Detach(deviceMountPath string, hostName string) error {
 	VolumeID := path.Base(deviceMountPath)
 
 	// Block execution until any pending attach/detach operations for this PD have completed
 	attachDetachMutex.LockKey(VolumeID)
 	defer attachDetachMutex.UnlockKey(VolumeID)
 
-	awsCloud, err := getCloudProvider(host.GetCloudProvider())
+	awsCloud, err := getCloudProvider(detacher.host.GetCloudProvider())
 	if err != nil {
 		return err
 	}
@@ -174,12 +176,11 @@ func (detacher *awsElasticBlockStoreDetacher) Detach(host volume.VolumeHost, dev
 			glog.Warningf("Retrying detach for AWS PD %q (retry count=%v).", VolumeID, numRetries)
 		}
 
-		if dev, err = awsCloud.DetachDisk(VolumeID, hostName); err != nil {
+		if _, err = awsCloud.DetachDisk(VolumeID, hostName); err != nil {
 			glog.Errorf("Error detaching PD %q: %v", VolumeID, err)
 			time.Sleep(errorSleepDuration)
 			continue
 		}
-		detacher.devicePath = dev
 		return nil
 	}
 
