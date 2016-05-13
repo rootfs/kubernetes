@@ -79,20 +79,26 @@ func (attacher *awsElasticBlockStoreAttacher) Attach(hostName string, mounter mo
 }
 
 func (attacher *awsElasticBlockStoreAttacher) WaitForAttach(timeout time.Duration) (string, error) {
-	ticker := time.NewTicker(checkSleepDuration)
-	defer ticker.Stop()
-	timer := time.NewTimer(timeout)
-	defer timer.Stop()
-
+	awsCloud, err := getCloudProvider(attacher.host.GetCloudProvider())
+	if err != nil {
+		return "", err
+	}
 	volumeSource, _ := getVolumeSource(attacher.spec)
 	VolumeID := volumeSource.VolumeID
 	partition := ""
 	if volumeSource.Partition != 0 {
 		partition = strconv.Itoa(int(volumeSource.Partition))
+	}	
+	devicePath, err := awsCloud.GetDiskPath(VolumeID) 
+	if err != nil {
+		return "", err
 	}
 
-	// FIXME: call aws DescribeVolume to retrieve device path
-	devicePath := ""
+	ticker := time.NewTicker(checkSleepDuration)
+	defer ticker.Stop()
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
 	devicePaths := getDiskByIdPaths(partition, devicePath)
 	for {
 		select {
