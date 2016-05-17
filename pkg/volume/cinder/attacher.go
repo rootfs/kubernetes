@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 )
 
-type cinderDiskAttacher struct{
+type cinderDiskAttacher struct {
 	host volume.VolumeHost
 	spec *volume.Spec
 }
@@ -40,7 +40,7 @@ var _ volume.Attacher = &cinderDiskAttacher{}
 var _ volume.AttachableVolumePlugin = &cinderPlugin{}
 
 const (
-	checkSleepDuration  = time.Second
+	checkSleepDuration = time.Second
 )
 
 // Singleton key mutex for keeping attach/detach operations for the same PD atomic
@@ -53,7 +53,7 @@ func (plugin *cinderPlugin) NewAttacher(spec *volume.Spec, pod *api.Pod) (volume
 }
 
 func (attacher *cinderDiskAttacher) Attach(hostName string, mounter mount.Interface) error {
-	volumeSource, _:= getVolumeSource(attacher.spec)
+	volumeSource, _ := getVolumeSource(attacher.spec)
 	VolumeID := volumeSource.VolumeID
 
 	// Block execution until any pending detach operations for this PD have completed
@@ -83,7 +83,7 @@ func (attacher *cinderDiskAttacher) WaitForAttach(timeout time.Duration) (string
 	if err != nil {
 		return "", err
 	}
-	devicePath, err := cloud.GetAttachmentDiskPath(instanceid, VolumeID) 
+	devicePath, err := cloud.GetAttachmentDiskPath(instanceid, VolumeID)
 	if err != nil {
 		return "", err
 	}
@@ -106,7 +106,7 @@ func (attacher *cinderDiskAttacher) WaitForAttach(timeout time.Duration) (string
 			} else {
 				//Log error, if any, and continue checking periodically
 				glog.Errorf("Error Stat Cinder disk (%q) is attached: %v", VolumeID, err)
-			} 
+			}
 		case <-timer.C:
 			return "", fmt.Errorf("Could not find attached Cinder disk %q. Timeout waiting for mount paths to be created.", VolumeID)
 		}
@@ -149,7 +149,7 @@ func (attacher *cinderDiskAttacher) MountDevice(devicePath string, deviceMountPa
 	return nil
 }
 
-type cinderDiskDetacher struct{
+type cinderDiskDetacher struct {
 	host volume.VolumeHost
 }
 
@@ -208,15 +208,15 @@ func (detacher *cinderDiskDetacher) UnmountDevice(deviceMountPath string, mounte
 	return nil
 }
 
-func getVolumeSource(spec *volume.Spec) (*api.AWSElasticBlockStoreVolumeSource, bool) {
+func getVolumeSource(spec *volume.Spec) (*api.CinderVolumeSource, bool) {
 	var readOnly bool
-	var volumeSource *api.AWSElasticBlockStoreVolumeSource
+	var volumeSource *api.CinderVolumeSource
 
-	if spec.Volume != nil && spec.Volume.AWSElasticBlockStore != nil {
-		volumeSource = spec.Volume.AWSElasticBlockStore
+	if spec.Volume != nil && spec.Volume.Cinder != nil {
+		volumeSource = spec.Volume.Cinder
 		readOnly = volumeSource.ReadOnly
 	} else {
-		volumeSource = spec.PersistentVolume.Spec.AWSElasticBlockStore
+		volumeSource = spec.PersistentVolume.Spec.Cinder
 		readOnly = spec.ReadOnly
 	}
 
