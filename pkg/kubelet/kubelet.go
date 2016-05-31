@@ -2123,7 +2123,6 @@ func (kl *Kubelet) cleanupOrphanedVolumes(pods []*api.Pod, runningPods []*kubeco
 			if err != nil {
 				glog.Errorf("Could not tear down volume %q at %q: %v", name, volumePath, err)
 			}
-
 			// volume is unmounted.  some volumes also require detachment from the node.
 			if cleaner.Detacher != nil && len(refs) == 1 {
 				// There is a bug in this code, where len(refs) is zero in some
@@ -2151,7 +2150,7 @@ func (kl *Kubelet) cleanupOrphanedVolumes(pods []*api.Pod, runningPods []*kubeco
 						api.UniqueDeviceName(uniqueDeviceName))
 				} else {
 					// Attach/Detach controller is disabled
-					err = detacher.Detach(pdName, kl.hostname)
+					err = detacher.Detach(pdName, nil, kl.hostname)
 					if err != nil {
 						glog.Errorf("Could not detach volume %q at %q: %v", name, volumePath, err)
 					}

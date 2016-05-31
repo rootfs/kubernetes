@@ -182,7 +182,7 @@ func (plugin *gcePersistentDiskPlugin) NewDetacher() (volume.Detacher, error) {
 // Callers are responsible for retryinging on failure.
 // Callers are responsible for thread safety between concurrent attach and detach
 // operations.
-func (detacher *gcePersistentDiskDetacher) Detach(deviceMountPath string, hostName string) error {
+func (detacher *gcePersistentDiskDetacher) Detach(deviceMountPath string, _ *volume.Spec, hostName string) error {
 	pdName := path.Base(deviceMountPath)
 
 	gceCloud, err := getCloudProvider(detacher.host.GetCloudProvider())

@@ -173,7 +173,7 @@ func (ad *attacherDetacher) generateDetachVolumeFunc(
 
 	return func() error {
 		// Execute detach
-		detachErr := volumeDetacher.Detach(deviceName, volumeToDetach.NodeName)
+		detachErr := volumeDetacher.Detach(deviceName, volumeToDetach.VolumeSpec, volumeToDetach.NodeName)
 
 		if detachErr != nil {
 			// On failure, just log and exit. The controller will retry
