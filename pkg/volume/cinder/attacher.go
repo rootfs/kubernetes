@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -69,6 +70,9 @@ func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, hostName string) e
 	instanceid, err := instances.InstanceID(hostName)
 	if err != nil {
 		return err
+	}
+	if ind := strings.LastIndex(instanceid, "/"); ind >= 0 {
+		instanceid = instanceid[ind:]
 	}
 	attached, err := cloud.DiskIsAttached(volumeID, instanceid)
 	if err != nil {
@@ -199,6 +203,9 @@ func (detacher *cinderDiskDetacher) Detach(deviceMountPath string, hostName stri
 		return fmt.Errorf("failed to list openstack instances")
 	}
 	instanceid, err := instances.InstanceID(hostName)
+	if ind := strings.LastIndex(instanceid, "/"); ind >= 0 {
+		instanceid = instanceid[ind:]
+	}
 
 	attached, err := cloud.DiskIsAttached(volumeID, instanceid)
 	if err != nil {
