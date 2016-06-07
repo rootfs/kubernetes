@@ -26,7 +26,6 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util/exec"
-	"k8s.io/kubernetes/pkg/util/keymutex"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -38,9 +37,6 @@ type awsElasticBlockStoreAttacher struct {
 var _ volume.Attacher = &awsElasticBlockStoreAttacher{}
 
 var _ volume.AttachableVolumePlugin = &awsElasticBlockStorePlugin{}
-
-// Singleton key mutex for keeping attach/detach operations for the same PD atomic
-var attachDetachMutex = keymutex.NewKeyMutex()
 
 func (plugin *awsElasticBlockStorePlugin) NewAttacher() (volume.Attacher, error) {
 	return &awsElasticBlockStoreAttacher{host: plugin.host}, nil
@@ -55,62 +51,53 @@ func (plugin *awsElasticBlockStorePlugin) GetDeviceName(spec *volume.Spec) (stri
 	return volumeSource.VolumeID, nil
 }
 
-func (plugin *awsElasticBlockStorePlugin) GetUniqueVolumeName(spec *volume.Spec) (string, error) {
-	volumeSource, _ := getVolumeSource(spec)
-	if volumeSource == nil {
-		return "", fmt.Errorf("Spec does not reference an EBS volume type")
-	}
-	partition := ""
-	if volumeSource.Partition != 0 {
-		partition = strconv.Itoa(int(volumeSource.Partition))
-	}
-	return fmt.Sprintf("%s/%s-%s:%v", awsElasticBlockStorePluginName, volumeSource.VolumeID, partition, volumeSource.ReadOnly), nil
-}
-
 func (attacher *awsElasticBlockStoreAttacher) Attach(spec *volume.Spec, hostName string) error {
 	volumeSource, readOnly := getVolumeSource(spec)
-	VolumeID := volumeSource.VolumeID
-
-	// Block execution until any pending detach operations for this PD have completed
-	attachDetachMutex.LockKey(VolumeID)
-	defer attachDetachMutex.UnlockKey(VolumeID)
+	volumeID := volumeSource.VolumeID
 
 	awsCloud, err := getCloudProvider(attacher.host.GetCloudProvider())
 	if err != nil {
 		return err
 	}
 
-	for numRetries := 0; numRetries < maxRetries; numRetries++ {
-		if numRetries > 0 {
-			glog.Warningf("Retrying attach for AWS PD %q (retry count=%v).", VolumeID, numRetries)
-		}
+	attached, err := awsCloud.DiskIsAttached(volumeID, hostName)
+	if err != nil {
+		// Log error and continue with attach
+		glog.Errorf(
+			"Error checking if volume (%q) is already attached to current node (%q). Will continue and try attach anyway. err=%v",
+			volumeID, hostName, err)
+	}
 
-		if _, err = awsCloud.AttachDisk(VolumeID, hostName, readOnly); err != nil {
-			glog.Errorf("Error attaching PD %q: %+v", VolumeID, err)
-			time.Sleep(errorSleepDuration)
-			continue
-		}
+	if err == nil && attached {
+		// Volume is already attached to node.
+		glog.Infof("Attach operation is successful. volume %q is already attached to node %q.", volumeID, hostName)
 		return nil
 	}
 
-	return err
+	if _, err = awsCloud.AttachDisk(volumeID, hostName, readOnly); err != nil {
+		glog.Errorf("Error attaching volume %q: %+v", volumeID, err)
+		return err
+	}
+	return nil
 }
 
-// TODO: use metadata service instead of querying cloud provider to retrieve devicePath
 func (attacher *awsElasticBlockStoreAttacher) WaitForAttach(spec *volume.Spec, timeout time.Duration) (string, error) {
 	awsCloud, err := getCloudProvider(attacher.host.GetCloudProvider())
 	if err != nil {
 		return "", err
 	}
 	volumeSource, _ := getVolumeSource(spec)
-	VolumeID := volumeSource.VolumeID
+	volumeID := volumeSource.VolumeID
 	partition := ""
 	if volumeSource.Partition != 0 {
 		partition = strconv.Itoa(int(volumeSource.Partition))
 	}
-	devicePath, err := awsCloud.GetDiskPath(VolumeID)
-	if err != nil {
-		return "", err
+
+	devicePath := ""
+	if d, err := awsCloud.GetDiskPath(volumeID); err == nil {
+		devicePath = d
+	} else {
+		glog.Errorf("GetDiskPath %q gets error %v", volumeID, err)
 	}
 
 	ticker := time.NewTicker(checkSleepDuration)
@@ -118,22 +105,33 @@ func (attacher *awsElasticBlockStoreAttacher) WaitForAttach(spec *volume.Spec, t
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 
-	devicePaths := getDiskByIdPaths(partition, devicePath)
 	for {
 		select {
 		case <-ticker.C:
-			glog.V(5).Infof("Checking AWS PD %q is attached.", VolumeID)
-			path, err := verifyDevicePath(devicePaths)
-			if err != nil {
-				// Log error, if any, and continue checking periodically. See issue #11321
-				glog.Errorf("Error verifying AWS PD (%q) is attached: %v", VolumeID, err)
-			} else if path != "" {
-				// A device path has successfully been created for the PD
-				glog.Infof("Successfully found attached AWS PD %q.", VolumeID)
-				return path, nil
+			glog.V(5).Infof("Checking AWS Volume %q is attached.", volumeID)
+			if devicePath == "" {
+				if d, err := awsCloud.GetDiskPath(volumeID); err == nil {
+					devicePath = d
+				} else {
+					glog.Errorf("GetDiskPath %q gets error %v", volumeID, err)
+				}
+			}
+			if devicePath != "" {
+				devicePaths := getDiskByIdPaths(partition, devicePath)
+				path, err := verifyDevicePath(devicePaths)
+				if err != nil {
+					// Log error, if any, and continue checking periodically. See issue #11321
+					glog.Errorf("Error verifying AWS Volume (%q) is attached: %v", volumeID, err)
+				} else if path != "" {
+					// A device path has successfully been created for the PD
+					glog.Infof("Successfully found attached AWS Volume %q.", volumeID)
+					return path, nil
+				}
+			} else {
+				glog.Errorf("AWS Volume (%q) is not attached yet", volumeID)
 			}
 		case <-timer.C:
-			return "", fmt.Errorf("Could not find attached AWS PD %q. Timeout waiting for mount paths to be created.", VolumeID)
+			return "", fmt.Errorf("Could not find attached AWS Volume %q. Timeout waiting for mount paths to be created.", volumeID)
 		}
 	}
 }
@@ -185,31 +183,31 @@ func (plugin *awsElasticBlockStorePlugin) NewDetacher() (volume.Detacher, error)
 }
 
 func (detacher *awsElasticBlockStoreDetacher) Detach(deviceMountPath string, hostName string) error {
-	VolumeID := path.Base(deviceMountPath)
-
-	// Block execution until any pending attach/detach operations for this PD have completed
-	attachDetachMutex.LockKey(VolumeID)
-	defer attachDetachMutex.UnlockKey(VolumeID)
+	volumeID := path.Base(deviceMountPath)
 
 	awsCloud, err := getCloudProvider(detacher.host.GetCloudProvider())
 	if err != nil {
 		return err
 	}
+	attached, err := awsCloud.DiskIsAttached(volumeID, hostName)
+	if err != nil {
+		// Log error and continue with detach
+		glog.Errorf(
+			"Error checking if volume (%q) is already attached to current node (%q). Will continue and try detach anyway. err=%v",
+			volumeID, hostName, err)
+	}
 
-	for numRetries := 0; numRetries < maxRetries; numRetries++ {
-		if numRetries > 0 {
-			glog.Warningf("Retrying detach for AWS PD %q (retry count=%v).", VolumeID, numRetries)
-		}
-
-		if _, err = awsCloud.DetachDisk(VolumeID, hostName); err != nil {
-			glog.Errorf("Error detaching PD %q: %v", VolumeID, err)
-			time.Sleep(errorSleepDuration)
-			continue
-		}
+	if err == nil && !attached {
+		// Volume is already detached from node.
+		glog.Infof("detach operation was successful. volume %q is already detached from node %q.", volumeID, hostName)
 		return nil
 	}
 
-	return err
+	if _, err = awsCloud.DetachDisk(volumeID, hostName); err != nil {
+		glog.Errorf("Error detaching volumeID %q: %v", volumeID, err)
+		return err
+	}
+	return nil
 }
 
 func (detacher *awsElasticBlockStoreDetacher) WaitForDetach(devicePath string, timeout time.Duration) error {

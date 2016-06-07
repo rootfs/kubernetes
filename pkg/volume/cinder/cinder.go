@@ -49,6 +49,7 @@ type CinderProvider interface {
 	GetDevicePath(diskId string) string
 	InstanceID() (string, error)
 	GetAttachmentDiskPath(instanceID string, diskName string) (string, error)
+	DiskIsAttached(diskName, instanceID string) (bool, error)
 }
 
 type cinderPlugin struct {
@@ -255,7 +256,7 @@ func (b *cinderVolumeMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
-// SetUp attaches the disk and bind mounts to the volume path.
+// SetUp bind mounts to the volume path.
 func (b *cinderVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	glog.V(5).Infof("Cinder SetUp %s to %s", b.pdName, dir)
 
@@ -273,11 +274,6 @@ func (b *cinderVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return nil
 	}
 	globalPDPath := makeGlobalPDName(b.plugin.host, b.pdName)
-	if err := b.manager.AttachDisk(b, globalPDPath); err != nil {
-		glog.V(4).Infof("AttachDisk failed: %v", err)
-		return err
-	}
-	glog.V(3).Infof("Cinder volume %s attached", b.pdName)
 
 	options := []string{"bind"}
 	if b.readOnly {
@@ -394,15 +390,6 @@ func (c *cinderVolumeUnmounter) TearDownAt(dir string) error {
 	}
 	glog.V(3).Infof("Successfully unmounted: %s\n", dir)
 
-	// If refCount is 1, then all bind mounts have been removed, and the
-	// remaining reference is the global mount. It is safe to detach.
-	if len(refs) == 1 {
-		if err := c.manager.DetachDisk(c); err != nil {
-			glog.V(4).Infof("DetachDisk failed: %v", err)
-			return err
-		}
-		glog.V(3).Infof("Volume %s detached", c.pdName)
-	}
 	notmnt, mntErr := c.mounter.IsLikelyNotMountPoint(dir)
 	if mntErr != nil {
 		glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)

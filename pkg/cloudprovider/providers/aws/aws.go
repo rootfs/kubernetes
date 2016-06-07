@@ -220,6 +220,9 @@ type Volumes interface {
 	// Get volume's disk path from volume name
 	// return the device path where the volume is attached
 	GetDiskPath(volumeName string) (string, error)
+
+	// Check if the volume is already attached to the instance
+	DiskIsAttached(diskName, instanceID string) (bool, error)
 }
 
 // InstanceGroups is an interface for managing cloud-managed instance groups / autoscaling instance groups
@@ -1472,6 +1475,23 @@ func (c *AWSCloud) GetDiskPath(volumeName string) (string, error) {
 		return "", fmt.Errorf("No attachement to volume %s", volumeName)
 	}
 	return aws.StringValue(info.Attachments[0].Device), nil
+}
+
+// Implement Volumes.DiskIsAttached
+func (c *AWSCloud) DiskIsAttached(diskName, instanceID string) (bool, error) {
+	awsInstance, err := c.getAwsInstance(instanceID)
+
+	info, err := awsInstance.describeInstance()
+	if err != nil {
+		return false, err
+	}
+	for _, blockDevice := range info.BlockDeviceMappings {
+		name := aws.StringValue(blockDevice.Ebs.VolumeId)
+		if name == diskName {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // Gets the current load balancer state

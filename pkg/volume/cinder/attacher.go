@@ -25,7 +25,6 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util/exec"
-	"k8s.io/kubernetes/pkg/util/keymutex"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -42,9 +41,6 @@ const (
 	checkSleepDuration = time.Second
 )
 
-// Singleton key mutex for keeping attach/detach operations for the same PD atomic
-var attachDetachMutex = keymutex.NewKeyMutex()
-
 func (plugin *cinderPlugin) NewAttacher() (volume.Attacher, error) {
 	return &cinderDiskAttacher{host: plugin.host}, nil
 }
@@ -58,21 +54,9 @@ func (plugin *cinderPlugin) GetDeviceName(spec *volume.Spec) (string, error) {
 	return volumeSource.VolumeID, nil
 }
 
-func (plugin *cinderPlugin) GetUniqueVolumeName(spec *volume.Spec) (string, error) {
-	volumeSource, _ := getVolumeSource(spec)
-	if volumeSource == nil {
-		return "", fmt.Errorf("Spec does not reference a Cinder volume type")
-	}
-	return fmt.Sprintf("%s/%s:%v", cinderVolumePluginName, volumeSource.VolumeID, volumeSource.ReadOnly), nil
-}
-
 func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, hostName string) error {
 	volumeSource, _ := getVolumeSource(spec)
-	VolumeID := volumeSource.VolumeID
-
-	// Block execution until any pending detach operations for this PD have completed
-	attachDetachMutex.LockKey(VolumeID)
-	defer attachDetachMutex.UnlockKey(VolumeID)
+	volumeID := volumeSource.VolumeID
 
 	cloud, err := getCloudProvider(attacher.host.GetCloudProvider())
 	if err != nil {
@@ -82,25 +66,40 @@ func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, hostName string) e
 	if err != nil {
 		return err
 	}
-	_, err = cloud.AttachDisk(instanceid, VolumeID)
+	attached, err := cloud.DiskIsAttached(volumeID, instanceid)
+	if err != nil {
+		// Log error and continue with attach
+		glog.Errorf(
+			"Error checking if volume (%q) is already attached to current node (%q). Will continue and try attach anyway. err=%v",
+			volumeID, instanceid, err)
+	}
+
+	if err == nil && attached {
+		// Volume is already attached to node.
+		glog.Infof("Attach operation is successful. volume %q is already attached to node %q.", volumeID, instanceid)
+		return nil
+	}
+
+	_, err = cloud.AttachDisk(instanceid, volumeID)
 	return err
 }
 
-// TODO: use metadata service instead of querying cloud provider to retrieve devicePath
 func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, timeout time.Duration) (string, error) {
 	cloud, err := getCloudProvider(attacher.host.GetCloudProvider())
 	if err != nil {
 		return "", err
 	}
 	volumeSource, _ := getVolumeSource(spec)
-	VolumeID := volumeSource.VolumeID
+	volumeID := volumeSource.VolumeID
 	instanceid, err := cloud.InstanceID()
 	if err != nil {
 		return "", err
 	}
-	devicePath, err := cloud.GetAttachmentDiskPath(instanceid, VolumeID)
-	if err != nil {
-		return "", err
+	devicePath := ""
+	if d, err := cloud.GetAttachmentDiskPath(instanceid, volumeID); err == nil {
+		devicePath = d
+	} else {
+		glog.Errorf("%q GetAttachmentDiskPath (%q) gets error %v", instanceid, volumeID, err)
 	}
 
 	ticker := time.NewTicker(checkSleepDuration)
@@ -112,18 +111,29 @@ func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, timeout tim
 		probeAttachedVolume()
 		select {
 		case <-ticker.C:
-			glog.V(5).Infof("Checking Cinder disk %q is attached.", VolumeID)
-			probeAttachedVolume()
-			exists, err := pathExists(devicePath)
-			if exists && err == nil {
-				glog.Infof("Successfully found attached Cinder disk %q.", VolumeID)
-				return devicePath, nil
+			glog.V(5).Infof("Checking Cinder disk %q is attached.", volumeID)
+			if devicePath == "" {
+				if d, err := cloud.GetAttachmentDiskPath(instanceid, volumeID); err == nil {
+					devicePath = d
+				} else {
+					glog.Errorf("%q GetAttachmentDiskPath (%q) gets error %v", instanceid, volumeID, err)
+				}
+			}
+			if devicePath == "" {
+				glog.Errorf("Cinder disk (%q) is not attached yet", volumeID)
 			} else {
-				//Log error, if any, and continue checking periodically
-				glog.Errorf("Error Stat Cinder disk (%q) is attached: %v", VolumeID, err)
+				probeAttachedVolume()
+				exists, err := pathExists(devicePath)
+				if exists && err == nil {
+					glog.Infof("Successfully found attached Cinder disk %q.", volumeID)
+					return devicePath, nil
+				} else {
+					//Log error, if any, and continue checking periodically
+					glog.Errorf("Error Stat Cinder disk (%q) is attached: %v", volumeID, err)
+				}
 			}
 		case <-timer.C:
-			return "", fmt.Errorf("Could not find attached Cinder disk %q. Timeout waiting for mount paths to be created.", VolumeID)
+			return "", fmt.Errorf("Could not find attached Cinder disk %q. Timeout waiting for mount paths to be created.", volumeID)
 		}
 	}
 }
@@ -175,19 +185,27 @@ func (plugin *cinderPlugin) NewDetacher() (volume.Detacher, error) {
 }
 
 func (detacher *cinderDiskDetacher) Detach(deviceMountPath string, hostName string) error {
-	VolumeID := path.Base(deviceMountPath)
-
-	// Block execution until any pending attach/detach operations for this PD have completed
-	attachDetachMutex.LockKey(VolumeID)
-	defer attachDetachMutex.UnlockKey(VolumeID)
-
+	volumeID := path.Base(deviceMountPath)
 	cloud, err := getCloudProvider(detacher.host.GetCloudProvider())
 	if err != nil {
 		return err
 	}
+	attached, err := cloud.DiskIsAttached(volumeID, hostName)
+	if err != nil {
+		// Log error and continue with detach
+		glog.Errorf(
+			"Error checking if volume (%q) is already attached to current node (%q). Will continue and try detach anyway. err=%v",
+			volumeID, hostName, err)
+	}
 
-	if err = cloud.DetachDisk(VolumeID, hostName); err != nil {
-		glog.Errorf("Error detaching PD %q: %v", VolumeID, err)
+	if err == nil && !attached {
+		// Volume is already detached from node.
+		glog.Infof("detach operation was successful. volume %q is already detached from node %q.", volumeID, hostName)
+		return nil
+	}
+
+	if err = cloud.DetachDisk(hostName, volumeID); err != nil {
+		glog.Errorf("Error detaching volume %q: %v", volumeID, err)
 		return err
 	}
 	return nil

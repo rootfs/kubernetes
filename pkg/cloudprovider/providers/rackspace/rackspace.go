@@ -632,3 +632,15 @@ func (rs *Rackspace) GetAttachmentDiskPath(instanceID string, diskName string) (
 	}
 	return "", fmt.Errorf("volume %s is not attached to %s", diskName, instanceID)
 }
+
+// query if a volume is attached to a compute instance
+func (rs *Rackspace) DiskIsAttached(diskName, instanceID string) (bool, error) {
+	disk, err := rs.getVolume(diskName)
+	if err != nil {
+		return false, err
+	}
+	if len(disk.Attachments) > 0 && disk.Attachments[0]["server_id"] != nil && instanceID == disk.Attachments[0]["server_id"] {
+		return true, nil
+	}
+	return false, nil
+}
