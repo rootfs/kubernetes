@@ -72,7 +72,7 @@ func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, hostName string) e
 		return err
 	}
 	if ind := strings.LastIndex(instanceid, "/"); ind >= 0 {
-		instanceid = instanceid[ind:]
+		instanceid = instanceid[(ind + 1):]
 	}
 	attached, err := cloud.DiskIsAttached(volumeID, instanceid)
 	if err != nil {
@@ -204,7 +204,7 @@ func (detacher *cinderDiskDetacher) Detach(deviceMountPath string, hostName stri
 	}
 	instanceid, err := instances.InstanceID(hostName)
 	if ind := strings.LastIndex(instanceid, "/"); ind >= 0 {
-		instanceid = instanceid[ind:]
+		instanceid = instanceid[(ind + 1):]
 	}
 
 	attached, err := cloud.DiskIsAttached(volumeID, instanceid)
