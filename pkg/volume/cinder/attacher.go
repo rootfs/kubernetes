@@ -62,7 +62,11 @@ func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, hostName string) e
 	if err != nil {
 		return err
 	}
-	instanceid, err := cloud.InstanceID()
+	instances, res := cloud.Instances()
+	if ! res  {
+		return fmt.Errorf("failed to list openstack instances")
+	}
+	instanceid, err := instances.InstanceID(hostName)
 	if err != nil {
 		return err
 	}
@@ -120,7 +124,7 @@ func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, timeout tim
 				}
 			}
 			if devicePath == "" {
-				glog.Errorf("Cinder disk (%q) is not attached yet", volumeID)
+				glog.V(5).Infof("Cinder disk (%q) is not attached yet", volumeID)
 			} else {
 				probeAttachedVolume()
 				exists, err := pathExists(devicePath)
@@ -190,7 +194,13 @@ func (detacher *cinderDiskDetacher) Detach(deviceMountPath string, hostName stri
 	if err != nil {
 		return err
 	}
-	attached, err := cloud.DiskIsAttached(volumeID, hostName)
+	instances, res := cloud.Instances()
+	if ! res  {
+		return fmt.Errorf("failed to list openstack instances")
+	}
+	instanceid, err := instances.InstanceID(hostName)
+
+	attached, err := cloud.DiskIsAttached(volumeID, instanceid)
 	if err != nil {
 		// Log error and continue with detach
 		glog.Errorf(
@@ -204,7 +214,7 @@ func (detacher *cinderDiskDetacher) Detach(deviceMountPath string, hostName stri
 		return nil
 	}
 
-	if err = cloud.DetachDisk(hostName, volumeID); err != nil {
+	if err = cloud.DetachDisk(instanceid, volumeID); err != nil {
 		glog.Errorf("Error detaching volume %q: %v", volumeID, err)
 		return err
 	}

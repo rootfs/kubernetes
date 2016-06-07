@@ -128,7 +128,7 @@ func (attacher *awsElasticBlockStoreAttacher) WaitForAttach(spec *volume.Spec, t
 					return path, nil
 				}
 			} else {
-				glog.Errorf("AWS Volume (%q) is not attached yet", volumeID)
+				glog.V(5).Infof("AWS Volume (%q) is not attached yet", volumeID)
 			}
 		case <-timer.C:
 			return "", fmt.Errorf("Could not find attached AWS Volume %q. Timeout waiting for mount paths to be created.", volumeID)
