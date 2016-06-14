@@ -21,7 +21,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
-	"path/filepath"
 	"strings"
 
 	"github.com/golang/glog"
@@ -30,7 +29,7 @@ import (
 
 type ioHandler interface {
 	ReadDir(dirname string) ([]os.FileInfo, error)
-	ReadFile(filename string)([]byte, error)
+	ReadFile(filename string) ([]byte, error)
 }
 
 type osIOHandler struct{}
@@ -38,7 +37,7 @@ type osIOHandler struct{}
 func (handler *osIOHandler) ReadDir(dirname string) ([]os.FileInfo, error) {
 	return ioutil.ReadDir(dirname)
 }
-func (handler *osIOHandler) ReadFile(filename string)([]byte, error) {
+func (handler *osIOHandler) ReadFile(filename string) ([]byte, error) {
 	return ioutil.ReadFile(filename)
 }
 
@@ -48,20 +47,20 @@ func findDiskByLun(lun int, io ioHandler) string {
 	if dirs, err := io.ReadDir(sys_path); err == nil {
 		for _, f := range dirs {
 			name := f.Name()
-			arr := strings.Split(name,":")
+			arr := strings.Split(name, ":")
 			if len(arr) < 4 {
 				continue
 			}
-			target,err := strconv.Atoi(arr[0])
+			target, err := strconv.Atoi(arr[0])
 			// skip targets 0-2, which are used by OS disks
-			if err == nil && target > 2  {
-				l,err := strconv.Atoi(arr[2])
+			if err == nil && target > 2 {
+				l, err := strconv.Atoi(arr[2])
 				if err == nil && lun == l {
 					// read vendor
-					if vendor, err := io.ReadFile(path.Join(sys_path, name,"vendor")); err == nil {
+					if vendor, err := io.ReadFile(path.Join(sys_path, name, "vendor")); err == nil {
 						if strings.ToUpper(string(vendor)) == "MSFT" {
 							// read model
-							if model, err := ioutil.ReadFile(path.Join(sys_path, name,"model")); err == nil {
+							if model, err := ioutil.ReadFile(path.Join(sys_path, name, "model")); err == nil {
 								if strings.ToUpper(string(vendor)) == "VIRTUAL DISK" {
 									// found it
 									if dev, err := io.ReadDir(path.Join(sys_path, name, "block")); err == nil {
@@ -70,7 +69,7 @@ func findDiskByLun(lun int, io ioHandler) string {
 								}
 							}
 						}
-					}				
+					}
 				}
 			}
 		}
@@ -78,19 +77,17 @@ func findDiskByLun(lun int, io ioHandler) string {
 	return ""
 }
 
-
-
 func makePDNameInternal(host volume.VolumeHost, lun string) string {
 	return path.Join(host.GetPluginDir(azurePluginName), "lun-"+lun)
 }
 
-type FCUtil struct{}
+type VHDUtil struct{}
 
-func (util *FCUtil) MakeGlobalPDName(fc fcDisk) string {
+func (util *VHDUtil) MakeGlobalPDName(fc fcDisk) string {
 	return makePDNameInternal(fc.plugin.host, fc.wwns, fc.lun)
 }
 
-func (util *FCUtil) AttachDisk(b azureDiskMounter) error {
+func (util *VHDUtil) AttachDisk(b azureDiskMounter) error {
 	lun := b.lun
 	io := b.io
 	disk := findDiskByLun(lun, io)
@@ -121,7 +118,7 @@ func (util *FCUtil) AttachDisk(b azureDiskMounter) error {
 	return err
 }
 
-func (util *FCUtil) DetachDisk(c fcDiskUnmounter, mntPath string) error {
+func (util *VHDUtil) DetachDisk(c fcDiskUnmounter, mntPath string) error {
 	if err := c.mounter.Unmount(mntPath); err != nil {
 		return fmt.Errorf("azure disk: detach disk: failed to unmount: %s\nError: %v", mntPath, err)
 	}

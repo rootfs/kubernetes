@@ -17,16 +17,12 @@ limitations under the License.
 package azure_dd
 
 import (
-	"fmt"
 	"os"
 	"path"
-	"path/filepath"
 	"strconv"
-	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"

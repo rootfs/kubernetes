@@ -29,11 +29,11 @@ type AzureDataDiskOp struct {
 	// attach (true) or detach (false)
 	attach bool
 	// when detach, use lun to locate data disk
-	lun  int32
+	lun int32
 	// disk name
 	name string
 	// vhd uri
-	uri  string
+	uri string
 	// caching type
 	caching compute.CachingTypes
 }
@@ -41,7 +41,7 @@ type AzureDataDiskOp struct {
 // Abstract interface to azure client operations.
 type azureUtil interface {
 	GetAzureSecret(host volume.VolumeHost, nameSpace, secretName string) (map[string]string, error)
-	UpdateVMDataDisks(map[string]string, string) err	
+	UpdateVMDataDisks(map[string]string, string) err
 }
 
 type azureSvc struct{}
@@ -87,7 +87,7 @@ func (s *azureSvc) GetAzureSecret(host volume.VolumeHost, nameSpace, secretName 
 	return m, nil
 }
 
-func (s *azureSvc) UpdateVMDataDisks(c map[string]string, op AzureDataDiskOp, vmName string) err{
+func (s *azureSvc) UpdateVMDataDisks(c map[string]string, op AzureDataDiskOp, vmName string) err {
 	oauthConfig, err := azure.PublicCloud.OAuthConfigForTenant(c["tenantID"])
 	if err != nil {
 		return err
@@ -105,17 +105,17 @@ func (s *azureSvc) UpdateVMDataDisks(c map[string]string, op AzureDataDiskOp, vm
 	disks := vm.Properties.StorageProfile.DataDisks
 	if op.attach {
 		disks = append(disks,
-			&compute.DataDisk {
+			&compute.DataDisk{
 				Name: &op.name,
-				Vhd: &compute.VirtualHardDisk {
+				Vhd: &compute.VirtualHardDisk{
 					URI: &op.uri,
-				}
+				},
 				Caching: op.caching,
 			})
 	} else { // detach
 		d := make([]*compute.DataDisk, len(disks))
 		for _, disk := range *disks {
-			if disk  != nil && disk.Lun != nil && *disk.Lun == op.lun {
+			if disk != nil && disk.Lun != nil && *disk.Lun == op.lun {
 				// found a disk to detach
 				glog.V(2).Infof("detach disk %#v", *disk)
 				continue
@@ -124,18 +124,16 @@ func (s *azureSvc) UpdateVMDataDisks(c map[string]string, op AzureDataDiskOp, vm
 		}
 		disks = d
 	}
-	newVM := compute.VirtualMachine {
+	newVM := compute.VirtualMachine{
 		Location: vm.Location,
-		Properties: &compute.VirtualMachineProperties {
-			StorageProfile: &compute.StorageProfile {
-				DataDisks: &disks
+		Properties: &compute.VirtualMachineProperties{
+			StorageProfile: &compute.StorageProfile{
+				DataDisks: &disks,
 			},
 		},
 	}
 	res, err := client.CreateOrUpdate(c["resourceGroup"], vmName,
 		newVM, nil)
-	glog.V(2).Info("azure VM CreateOrUpdate result:%#v",res)
+	glog.V(2).Info("azure VM CreateOrUpdate result:%#v", res)
 	return err
 }
-
-
