@@ -24,6 +24,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Azure/azure-sdk-for-go/arm/compute"
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/util/exec"
 )
 
@@ -84,10 +86,40 @@ func findDiskByLun(lun int, io ioHandler) string {
 
 type azureDiskUtil struct{}
 
-func (util *azureDiskUtil) AttachDisk(b *azureDiskMounter) error {
+func (util *azureDiskUtil) AttachDisk(b *azureDiskMounter, vmName string) error {
+	m, err := b.util.getAzureSecret(b.plugin.host, b.namespace, b.secretName)
+	if err != nil {
+		glog.Errorf("failed to get Azure secret and config")
+		return err
+	}
+
+	var op azureDataDiskOp
+	op.action = ATTACH
+	op.name = b.diskName
+	op.uri = b.diskUri
+	op.caching = compute.CachingTypes(b.cachingMode)
+	err = b.util.vmDataDisksOp(m, op, vmName)
+	if err != nil {
+		glog.Errorf("failed to attach disk %q to host %q", b.diskName, vmName)
+		return err
+	}
 	return nil
 }
 
-func (util *azureDiskUtil) DetachDisk(c *azureDiskUnmounter) error {
+func (util *azureDiskUtil) DetachDisk(b *azureDiskUnmounter, vmName string) error {
+	m, err := b.util.getAzureSecret(b.plugin.host, b.namespace, b.secretName)
+	if err != nil {
+		glog.Errorf("failed to get Azure secret and config")
+		return err
+	}
+
+	var op azureDataDiskOp
+	op.action = DETACH
+	op.lun = b.lun
+	err = b.util.vmDataDisksOp(m, op, vmName)
+	if err != nil {
+		glog.Errorf("failed to detach disk (lun=%q) to host %q", b.lun, vmName)
+		return err
+	}
 	return nil
 }

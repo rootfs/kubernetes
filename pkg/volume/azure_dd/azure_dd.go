@@ -45,9 +45,9 @@ type azureDataDiskPlugin struct {
 // Abstract interface to disk operations.
 type azureManager interface {
 	// Attaches the disk to the host machine.
-	AttachDisk(mounter *azureDiskMounter) error
+	AttachDisk(mounter *azureDiskMounter, host string) error
 	// Detaches the disk from the host machine.
-	DetachDisk(unmounter *azureDiskUnmounter) error
+	DetachDisk(unmounter *azureDiskUnmounter, host string) error
 }
 
 var _ volume.VolumePlugin = &azureDataDiskPlugin{}
@@ -92,10 +92,10 @@ func (plugin *azureDataDiskPlugin) GetAccessModes() []api.PersistentVolumeAccess
 }
 
 func (plugin *azureDataDiskPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
-	return plugin.newMounterInternal(spec, pod.UID, &azureDiskUtil{}, plugin.host.GetMounter())
+	return plugin.newMounterInternal(spec, pod.Namespace, pod.UID, &azureDiskUtil{}, &azureSvc{}, plugin.host.GetMounter())
 }
 
-func (plugin *azureDataDiskPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager azureManager, mounter mount.Interface) (volume.Mounter, error) {
+func (plugin *azureDataDiskPlugin) newMounterInternal(spec *volume.Spec, namespace string, podUID types.UID, manager azureManager, util azureUtil, mounter mount.Interface) (volume.Mounter, error) {
 	// azures used directly in a pod have a ReadOnly flag set by the pod author.
 	// azures used as a PersistentVolume gets the ReadOnly flag indirectly through the persistent-claim volume used to mount the PV
 	azure, readOnly, err := getVolumeSource(spec)
@@ -122,7 +122,9 @@ func (plugin *azureDataDiskPlugin) newMounterInternal(spec *volume.Spec, podUID 
 			diskUri:     diskUri,
 			cachingMode: cachingMode,
 			partition:   partition,
+			namespace:   namespace,
 			manager:     manager,
+			util:        util,
 			mounter:     mounter,
 			plugin:      plugin,
 		},
@@ -153,6 +155,9 @@ type azureDisk struct {
 	diskUri     string
 	cachingMode api.AzureDataDiskCachingMode
 	partition   string
+	lun         int32
+	namespace   string
+	util        azureUtil
 	manager     azureManager
 	mounter     mount.Interface
 	plugin      *azureDataDiskPlugin

@@ -34,7 +34,7 @@ const (
 )
 
 // operation and info on Azure Data Disk
-type AzureDataDiskOp struct {
+type azureDataDiskOp struct {
 	// attach/detach/query
 	action diskOp
 	// when detach, use lun to locate data disk
@@ -49,13 +49,13 @@ type AzureDataDiskOp struct {
 
 // Abstract interface to azure client operations.
 type azureUtil interface {
-	GetAzureSecret(host volume.VolumeHost, nameSpace, secretName string) (map[string]string, error)
-	UpdateVMDataDisks(map[string]string, string) error
+	getAzureSecret(host volume.VolumeHost, nameSpace, secretName string) (map[string]string, error)
+	vmDataDisksOp(c map[string]string, op azureDataDiskOp, vmName string) error
 }
 
 type azureSvc struct{}
 
-func (s *azureSvc) GetAzureSecret(host volume.VolumeHost, nameSpace, secretName string) (map[string]string, error) {
+func (s *azureSvc) getAzureSecret(host volume.VolumeHost, nameSpace, secretName string) (map[string]string, error) {
 	var clientId, clientSecret, subId, tenantId, resourceGroupName string
 	kubeClient := host.GetKubeClient()
 	if kubeClient == nil {
@@ -100,7 +100,7 @@ func (s *azureSvc) GetAzureSecret(host volume.VolumeHost, nameSpace, secretName 
 // to attach: op.action = ATTACH, op.name and op.uri must be set
 // to detach: op.action = DETACH, op.lun must be set
 // to query:  op.action = QUERY, op.name or op.uri must be set, op.lun is returned
-func (s *azureSvc) VMDataDisksOp(c map[string]string, op AzureDataDiskOp, vmName string) error {
+func (s *azureSvc) vmDataDisksOp(c map[string]string, op azureDataDiskOp, vmName string) error {
 	oauthConfig, err := azure.PublicCloud.OAuthConfigForTenant(c["tenantID"])
 	if err != nil {
 		return err
@@ -137,7 +137,7 @@ func (s *azureSvc) VMDataDisksOp(c map[string]string, op AzureDataDiskOp, vmName
 		}
 		res, err := client.CreateOrUpdate(c["resourceGroup"], vmName,
 			newVM, nil)
-		glog.V(2).Info("azure VM CreateOrUpdate result:%#v", res)
+		glog.V(2).Info("azure attach result:%#v", res)
 		return err
 	case DETACH:
 		d := make([]compute.DataDisk, len(disks))
@@ -161,7 +161,7 @@ func (s *azureSvc) VMDataDisksOp(c map[string]string, op AzureDataDiskOp, vmName
 		}
 		res, err := client.CreateOrUpdate(c["resourceGroup"], vmName,
 			newVM, nil)
-		glog.V(2).Info("azure VM CreateOrUpdate result:%#v", res)
+		glog.V(2).Info("azure detach result:%#v", res)
 		return err
 	case QUERY:
 		for _, disk := range disks {
