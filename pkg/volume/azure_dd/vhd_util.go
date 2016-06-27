@@ -67,7 +67,7 @@ func findDiskByLun(lun int, io ioHandler) string {
 					if err != nil {
 						continue
 					}
-					matched, err := regexp.MatchString("^Msft\nVirtual Disk\n$", string(out))
+					matched, err := regexp.MatchString("^Msft[ ]{0,}\nVirtual Disk[ ]{0,}\n$", string(out))
 					if err != nil || !matched {
 						continue
 					}

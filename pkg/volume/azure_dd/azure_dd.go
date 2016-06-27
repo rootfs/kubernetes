@@ -38,14 +38,14 @@ func ProbeVolumePlugins() []volume.VolumePlugin {
 }
 
 type azureDataDiskPlugin struct {
-	host volume.VolumeHost
+	host        volume.VolumeHost
 	volumeLocks keymutex.KeyMutex
 }
 
 // Abstract interface to disk operations.
 type azureManager interface {
 	// Attaches the disk to the host machine.
-	AttachDisk(mounter *azureDiskMounter, globalPDPath string) error
+	AttachDisk(mounter *azureDiskMounter) error
 	// Detaches the disk from the host machine.
 	DetachDisk(unmounter *azureDiskUnmounter) error
 }
@@ -115,16 +115,16 @@ func (plugin *azureDataDiskPlugin) newMounterInternal(spec *volume.Spec, podUID 
 
 	return &azureDiskMounter{
 		azureDisk: &azureDisk{
-			podUID:     podUID,
-			volName:    spec.Name(),
-			secretName: secretName,
-			diskName:   diskName,
-			diskUri:    diskUri,
-			cachingMode:  cachingMode,
-			partition:  partition,
-			manager:    manager,
-			mounter:    mounter,
-			plugin:     plugin,
+			podUID:      podUID,
+			volName:     spec.Name(),
+			secretName:  secretName,
+			diskName:    diskName,
+			diskUri:     diskUri,
+			cachingMode: cachingMode,
+			partition:   partition,
+			manager:     manager,
+			mounter:     mounter,
+			plugin:      plugin,
 		},
 		fsType:      fsType,
 		readOnly:    readOnly,
@@ -146,16 +146,16 @@ func (plugin *azureDataDiskPlugin) newUnmounterInternal(volName string, podUID t
 }
 
 type azureDisk struct {
-	volName    string
-	podUID     types.UID
-	secretName string
-	diskName   string
-	diskUri    string
-	cachingMode  api.AzureDataDiskCachingMode
-	partition  string
-	manager    azureManager
-	mounter    mount.Interface
-	plugin     *azureDataDiskPlugin
+	volName     string
+	podUID      types.UID
+	secretName  string
+	diskName    string
+	diskUri     string
+	cachingMode api.AzureDataDiskCachingMode
+	partition   string
+	manager     azureManager
+	mounter     mount.Interface
+	plugin      *azureDataDiskPlugin
 	volume.MetricsNil
 }
 
@@ -320,7 +320,6 @@ func (c *azureDiskUnmounter) TearDownAt(dir string) error {
 	}
 	return nil
 }
-
 
 func getVolumeSource(spec *volume.Spec) (*api.AzureDiskVolumeSource, bool, error) {
 	var readOnly bool
