@@ -25,10 +25,18 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 )
 
+type diskOp int
+
+const (
+	ATTACH diskOp = iota
+	DETACH
+	QUERY
+)
+
 // operation and info on Azure Data Disk
 type AzureDataDiskOp struct {
-	// attach (true) or detach (false)
-	attach bool
+	// attach/detach/query
+	action diskOp
 	// when detach, use lun to locate data disk
 	lun int32
 	// disk name
@@ -88,7 +96,11 @@ func (s *azureSvc) GetAzureSecret(host volume.VolumeHost, nameSpace, secretName 
 	return m, nil
 }
 
-func (s *azureSvc) UpdateVMDataDisks(c map[string]string, op AzureDataDiskOp, vmName string) error {
+// attach/detach/query vm's data disks
+// to attach: op.action = ATTACH, op.name and op.uri must be set
+// to detach: op.action = DETACH, op.lun must be set
+// to query:  op.action = QUERY, op.name or op.uri must be set, op.lun is returned
+func (s *azureSvc) VMDataDisksOp(c map[string]string, op AzureDataDiskOp, vmName string) error {
 	oauthConfig, err := azure.PublicCloud.OAuthConfigForTenant(c["tenantID"])
 	if err != nil {
 		return err
@@ -104,7 +116,8 @@ func (s *azureSvc) UpdateVMDataDisks(c map[string]string, op AzureDataDiskOp, vm
 		return err
 	}
 	disks := *vm.Properties.StorageProfile.DataDisks
-	if op.attach {
+	switch op.action {
+	case ATTACH:
 		disks = append(disks,
 			compute.DataDisk{
 				Name: &op.name,
@@ -113,28 +126,56 @@ func (s *azureSvc) UpdateVMDataDisks(c map[string]string, op AzureDataDiskOp, vm
 				},
 				Caching: op.caching,
 			})
-	} else { // detach
+
+		newVM := compute.VirtualMachine{
+			Location: vm.Location,
+			Properties: &compute.VirtualMachineProperties{
+				StorageProfile: &compute.StorageProfile{
+					DataDisks: &disks,
+				},
+			},
+		}
+		res, err := client.CreateOrUpdate(c["resourceGroup"], vmName,
+			newVM, nil)
+		glog.V(2).Info("azure VM CreateOrUpdate result:%#v", res)
+		return err
+	case DETACH:
 		d := make([]compute.DataDisk, len(disks))
 		for _, disk := range disks {
 			if disk.Lun != nil && *disk.Lun == op.lun {
 				// found a disk to detach
-				glog.V(2).Infof("detach disk %#v", disk)
+				glog.V(2).Infof("detach disk: lun %d name %s uri %s size(GB): %d\n", *disk.Lun, *disk.Name, *disk.Vhd.URI, *disk.DiskSizeGB)
 				continue
 			}
 			d = append(d, disk)
 		}
 		disks = d
-	}
-	newVM := compute.VirtualMachine{
-		Location: vm.Location,
-		Properties: &compute.VirtualMachineProperties{
-			StorageProfile: &compute.StorageProfile{
-				DataDisks: &disks,
+
+		newVM := compute.VirtualMachine{
+			Location: vm.Location,
+			Properties: &compute.VirtualMachineProperties{
+				StorageProfile: &compute.StorageProfile{
+					DataDisks: &disks,
+				},
 			},
-		},
+		}
+		res, err := client.CreateOrUpdate(c["resourceGroup"], vmName,
+			newVM, nil)
+		glog.V(2).Info("azure VM CreateOrUpdate result:%#v", res)
+		return err
+	case QUERY:
+		for _, disk := range disks {
+			if disk.Lun != nil {
+				if (disk.Name != nil && op.name != "" && *disk.Name == op.name) ||
+					(disk.Vhd.URI != nil && op.uri != "" && *disk.Vhd.URI == op.uri) {
+					// found the disk
+					glog.V(4).Infof("find disk: lun %d name %s uri %s size(GB): %d\n", *disk.Lun, *disk.Name, *disk.Vhd.URI, *disk.DiskSizeGB)
+					op.lun = *disk.Lun
+					return nil
+				}
+			}
+		}
+		return fmt.Errorf("cannot find vhd with name %s and uri %s", op.name, op.uri)
 	}
-	res, err := client.CreateOrUpdate(c["resourceGroup"], vmName,
-		newVM, nil)
-	glog.V(2).Info("azure VM CreateOrUpdate result:%#v", res)
-	return err
+	return nil
 }
