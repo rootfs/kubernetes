@@ -281,14 +281,15 @@ func (s *CMServer) Run(_ []string) error {
 	volumeController := persistentvolumecontroller.NewPersistentVolumeController(
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "persistent-volume-binder")),
 		s.PVClaimBinderSyncPeriod.Duration,
-		provisioner,
 		kubecontrollermanager.ProbeRecyclableVolumePlugins(s.VolumeConfiguration),
 		cloud,
 		s.ClusterName,
 		nil,
 		nil,
 		nil,
+		nil,
 		s.VolumeConfiguration.EnableDynamicProvisioning,
+		"",
 	)
 	volumeController.Run()
 

@@ -25,6 +25,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
@@ -55,6 +56,10 @@ type VolumeOptions struct {
 	ClusterName string
 	// Tags to attach to the real volume in the cloud provider - e.g. AWS EBS
 	CloudTags *map[string]string
+	// Volume provisioning parameters from StorageClass
+	ProvisionerParameters map[string]string
+	// Volume selector from PersistentVolumeClaim
+	ProvisionerSelector *unversioned.LabelSelector
 }
 
 // VolumePlugin is an interface to volume plugins that can be used on a
@@ -419,10 +424,34 @@ func (pm *VolumePluginMgr) FindRecyclablePluginBySpec(spec *Spec) (RecyclableVol
 	return nil, fmt.Errorf("no recyclable volume plugin matched")
 }
 
-// FindDeletablePluginByName fetches a persistent volume plugin by name.  If
+func (pm *VolumePluginMgr) FindProvisionablePluginByName(name string) (ProvisionableVolumePlugin, error) {
+	volumePlugin, err := pm.FindPluginByName(name)
+	if err != nil {
+		return nil, err
+	}
+	if provisionableVolumePlugin, ok := volumePlugin.(ProvisionableVolumePlugin); ok {
+		return provisionableVolumePlugin, nil
+	}
+	return nil, fmt.Errorf("no recyclable volume plugin matched")
+}
+
+// FindDeletablePluginBySppec fetches a persistent volume plugin by spec.  If
 // no plugin is found, returns error.
 func (pm *VolumePluginMgr) FindDeletablePluginBySpec(spec *Spec) (DeletableVolumePlugin, error) {
 	volumePlugin, err := pm.FindPluginBySpec(spec)
+	if err != nil {
+		return nil, err
+	}
+	if deletableVolumePlugin, ok := volumePlugin.(DeletableVolumePlugin); ok {
+		return deletableVolumePlugin, nil
+	}
+	return nil, fmt.Errorf("no deletable volume plugin matched")
+}
+
+// FindDeletablePluginByName fetches a persistent volume plugin by name.  If
+// no plugin is found, returns error.
+func (pm *VolumePluginMgr) FindDeletablePluginByName(name string) (DeletableVolumePlugin, error) {
+	volumePlugin, err := pm.FindPluginByName(name)
 	if err != nil {
 		return nil, err
 	}

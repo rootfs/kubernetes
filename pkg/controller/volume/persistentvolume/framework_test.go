@@ -555,7 +555,7 @@ func newVolumeReactor(client *fake.Clientset, ctrl *PersistentVolumeController, 
 	return reactor
 }
 
-func newTestController(kubeClient clientset.Interface, volumeSource, claimSource cache.ListerWatcher, enableDynamicProvisioning bool) *PersistentVolumeController {
+func newTestController(kubeClient clientset.Interface, volumeSource, claimSource, classSource cache.ListerWatcher, enableDynamicProvisioning bool) *PersistentVolumeController {
 	if volumeSource == nil {
 		volumeSource = framework.NewFakePVControllerSource()
 	}
@@ -571,6 +571,7 @@ func newTestController(kubeClient clientset.Interface, volumeSource, claimSource
 		"",
 		volumeSource,
 		claimSource,
+		classSource,
 		record.NewFakeRecorder(1000), // event recorder
 		enableDynamicProvisioning,
 	)
@@ -839,7 +840,7 @@ func runSyncTests(t *testing.T, tests []controllerTest) {
 
 		// Initialize the controller
 		client := &fake.Clientset{}
-		ctrl := newTestController(client, nil, nil, true)
+		ctrl := newTestController(client, nil, nil, nil, true)
 		reactor := newVolumeReactor(client, ctrl, nil, nil, test.errors)
 		for _, claim := range test.initialClaims {
 			ctrl.claims.Add(claim)
@@ -883,7 +884,7 @@ func runMultisyncTests(t *testing.T, tests []controllerTest) {
 
 		// Initialize the controller
 		client := &fake.Clientset{}
-		ctrl := newTestController(client, nil, nil, true)
+		ctrl := newTestController(client, nil, nil, nil, true)
 		reactor := newVolumeReactor(client, ctrl, nil, nil, test.errors)
 		for _, claim := range test.initialClaims {
 			ctrl.claims.Add(claim)
