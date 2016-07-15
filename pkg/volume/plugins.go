@@ -288,6 +288,10 @@ type VolumeConfig struct {
 	// the system and only understood by the binary hosting the plugin and the
 	// plugin itself.
 	OtherAttributes map[string]string
+
+	// ProvosioningEnabled configures whether provisioning of this plugin is
+	// enabled or not. Currently used only in host_path plugin.
+	ProvisioningEnabled bool
 }
 
 // NewSpecFromVolume creates an Spec from an api.Volume
