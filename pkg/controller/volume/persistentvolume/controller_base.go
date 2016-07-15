@@ -578,3 +578,25 @@ func storeObjectUpdate(store cache.Store, obj interface{}, className string) (bo
 	}
 	return true, nil
 }
+
+// getVolumeClass returns value of annClass annotation or empty string in case
+// the annotation does not exist.
+// TODO: change to PersistentVolume.Spec.Class value when this attribute is
+// introduced.
+func getVolumeClass(volume *api.PersistentVolume) string {
+	if class, found := volume.Annotations[annClass]; found {
+		return class
+	}
+	return ""
+}
+
+// getClaimClass returns value of annClass annotation or empty string in case
+// the annotation does not exist.
+// TODO: change to PersistentVolumeClaim.Spec.Class value when this attribute is
+// introduced.
+func getClaimClass(claim *api.PersistentVolumeClaim) string {
+	if class, found := claim.Annotations[annClass]; found {
+		return class
+	}
+	return ""
+}
