@@ -33,3 +33,5 @@ type ReplicaSetExpansion interface{}
 type ScaleExpansion interface{}
 
 type ThirdPartyResourceExpansion interface{}
+
+type StorageClassExpansion interface{}

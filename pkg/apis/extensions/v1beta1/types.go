@@ -1209,14 +1209,14 @@ type StorageClass struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-	v1.ObjectMeta `json:"metadata,omitempty"`
+	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// ProvisionerType indicates the type of the provisioner.
-	ProvisionerType string `json:"provisionerType,omitempty"`
+	ProvisionerType string `json:"provisionerType,omitempty" protobuf:"bytes,2,opt,name=provisionerType"`
 
 	// ProvisionerParameters holds the parameters for the provisioner that should
 	// create volumes of this storage class.
-	ProvisionerParameters map[string]string `json:"provisionerParameters,omitempty"`
+	ProvisionerParameters map[string]string `json:"provisionerParameters,omitempty" protobuf:"bytes,3,rep,name=provisionerParameters"`
 }
 
 // ProvisionerType describes the type of a provisioner.
@@ -1235,8 +1235,8 @@ type StorageClassList struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-	unversioned.ListMeta `json:"metadata,omitempty"`
+	unversioned.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Items is the list of StorageClasses
-	Items []StorageClass `json:"items"`
+	Items []StorageClass `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
