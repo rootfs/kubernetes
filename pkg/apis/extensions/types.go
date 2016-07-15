@@ -899,3 +899,45 @@ type NetworkPolicyList struct {
 
 	Items []NetworkPolicy `json:"items"`
 }
+
+// +genclient=true
+// +nonNamespaced=true
+
+// StorageClass describes the parameters for a class of storage for
+// which PersistentVolumes can be dynamically provisioned.
+//
+// StorageClasses are non-namespaced; the name of the storage class
+// according to etcd is in ObjectMeta.Name.
+type StorageClass struct {
+	unversioned.TypeMeta `json:",inline"`
+	api.ObjectMeta       `json:"metadata,omitempty"`
+
+	// ProvisionerType indicates the type of the provisioner.
+	ProvisionerType string `json:"provisionerType,omitempty"`
+
+	// ProvisionerParameters holds the parameters for the provisioner that should
+	// create volumes of this storage class.
+	ProvisionerParameters map[string]string `json:"provisionerParameters,omitempty"`
+}
+
+// ProvisionerType describes the type of a provisioner.
+
+// List of provisioners for StorageClass.ProvisionerType that are compiled into
+// Kubernetes. Note that StorageClass.ProvisionerType is a free form string and
+// it is not limited to values listed here.
+const (
+	ProvisionerTypeAWSEBS string = "kubernetes.io/aws-ebs"
+	ProvisionerTypeGCEPD  string = "kubernetes.io/gce-pd"
+	ProvisionerTypeCinder string = "kubernetes.io/cinder"
+)
+
+// StorageClassList is a collection of storage classes.
+type StorageClassList struct {
+	unversioned.TypeMeta `json:",inline"`
+	// Standard list metadata
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	unversioned.ListMeta `json:"metadata,omitempty"`
+
+	// Items is the list of StorageClasses
+	Items []StorageClass `json:"items"`
+}
