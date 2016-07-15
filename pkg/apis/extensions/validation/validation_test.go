@@ -1929,3 +1929,76 @@ func newBool(val bool) *bool {
 	*p = val
 	return p
 }
+
+func TestValidateStorageClass(t *testing.T) {
+	successCases := []extensions.StorageClass{
+		{
+			// Empty type and parameters
+			ObjectMeta:            api.ObjectMeta{Name: "foo"},
+			ProvisionerType:       "",
+			ProvisionerParameters: map[string]string{},
+		},
+		{
+			// nil parameters
+			ObjectMeta:      api.ObjectMeta{Name: "foo"},
+			ProvisionerType: "",
+		},
+		{
+			// some parameters
+			ObjectMeta:      api.ObjectMeta{Name: "foo"},
+			ProvisionerType: "kubernetes.io/foo-provisioner",
+			ProvisionerParameters: map[string]string{
+				"kubernetes.io/foo-parameter": "free/form/string",
+				"foo-parameter":               "free-form-string",
+				"foo-parameter2":              "{\"embeded\": \"json\", \"with\": {\"structures\":\"inside\"}}",
+			},
+		},
+	}
+
+	// Success cases are expected to pass validation.
+	for k, v := range successCases {
+		if errs := ValidateStorageClass(&v); len(errs) != 0 {
+			t.Errorf("Expected success for %d, got %v", k, errs)
+		}
+	}
+
+	// generate a map longer than maxProvisionerParameterSize
+	longParameters := make(map[string]string)
+	totalSize := 0
+	for totalSize < maxProvisionerParameterSize {
+		k := fmt.Sprintf("param/%d", totalSize)
+		v := fmt.Sprintf("value-%d", totalSize)
+		longParameters[k] = v
+		totalSize = totalSize + len(k) + len(v)
+	}
+
+	errorCases := map[string]extensions.StorageClass{
+		"namespace is present": {
+			ObjectMeta:      api.ObjectMeta{Name: "foo", Namespace: "bar"},
+			ProvisionerType: "kubernetes.io/foo-provisioner",
+		},
+		"invalid provisionerType": {
+			ObjectMeta:      api.ObjectMeta{Name: "foo"},
+			ProvisionerType: "kubernetes.io/invalid/provisioner",
+		},
+		"invalid parameter name": {
+			ObjectMeta:      api.ObjectMeta{Name: "foo"},
+			ProvisionerType: "kubernetes.io/foo",
+			ProvisionerParameters: map[string]string{
+				"invalid/parameter/name": "value",
+			},
+		},
+		"too long parameters": {
+			ObjectMeta:            api.ObjectMeta{Name: "foo"},
+			ProvisionerType:       "kubernetes.io/foo",
+			ProvisionerParameters: longParameters,
+		},
+	}
+
+	// Error cases are not expected to pass validation.
+	for testName, storageClass := range errorCases {
+		if errs := ValidateStorageClass(&storageClass); len(errs) == 0 {
+			t.Errorf("Expected failure for test: %s", testName)
+		}
+	}
+}

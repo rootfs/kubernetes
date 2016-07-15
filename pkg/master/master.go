@@ -100,6 +100,7 @@ import (
 	serviceetcd "k8s.io/kubernetes/pkg/registry/service/etcd"
 	ipallocator "k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	serviceaccountetcd "k8s.io/kubernetes/pkg/registry/serviceaccount/etcd"
+	storageclassetcd "k8s.io/kubernetes/pkg/registry/storageclass/etcd"
 	thirdpartyresourceetcd "k8s.io/kubernetes/pkg/registry/thirdpartyresource/etcd"
 	"k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata"
 	thirdpartyresourcedataetcd "k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata/etcd"
@@ -882,6 +883,10 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 	networkPolicyStorage := networkpolicyetcd.NewREST(restOptions("networkpolicies"))
 	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("networkpolicies")) {
 		storage["networkpolicies"] = networkPolicyStorage
+	}
+	storageClassStorage := storageclassetcd.NewREST(restOptions("storageclasses"))
+	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("storageclasses")) {
+		storage["storageclasses"] = storageClassStorage
 	}
 
 	return storage

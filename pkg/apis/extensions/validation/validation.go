@@ -741,3 +741,52 @@ func ValidateNetworkPolicyUpdate(update, old *extensions.NetworkPolicy) field.Er
 	}
 	return allErrs
 }
+
+// ValidateStorageClass validates a StorageClass.
+func ValidateStorageClass(storageClass *extensions.StorageClass) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMeta(&storageClass.ObjectMeta, false, apivalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
+	allErrs = append(allErrs, validateProvisionerType(storageClass.ProvisionerType, field.NewPath("provisionerType"))...)
+	allErrs = append(allErrs, validateProvisionerParameters(storageClass.ProvisionerParameters, field.NewPath("provisionerParameters"))...)
+
+	return allErrs
+}
+
+// ValidateStorageClassUpdate tests if required fields in the StorageClass are set.
+func ValidateStorageClassUpdate(storageClass, oldStorageClass *extensions.StorageClass) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&storageClass.ObjectMeta, &oldStorageClass.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, validateProvisionerType(storageClass.ProvisionerType, field.NewPath("provisionerType"))...)
+	allErrs = append(allErrs, validateProvisionerParameters(storageClass.ProvisionerParameters, field.NewPath("provisionerParameters"))...)
+
+	return allErrs
+}
+
+func validateProvisionerType(provisionerType string, fldPath *field.Path) field.ErrorList {
+	// provisionerType must be a valid qualified name
+	allErrs := field.ErrorList{}
+	if len(provisionerType) > 0 {
+		for _, msg := range validation.IsQualifiedName(strings.ToLower(provisionerType)) {
+			allErrs = append(allErrs, field.Invalid(fldPath, provisionerType, msg))
+		}
+	}
+	return allErrs
+}
+
+const maxProvisionerParameterSize = 256 * (1 << 10) // 256 kB
+func validateProvisionerParameters(params map[string]string, fldPath *field.Path) field.ErrorList {
+	// provisionerParameter keys must be valid qualified names
+	// provisionerParameter must be smaller than 256 kB
+	var totalSize int64
+	allErrs := field.ErrorList{}
+
+	for k, v := range params {
+		for _, msg := range validation.IsQualifiedName(strings.ToLower(k)) {
+			allErrs = append(allErrs, field.Invalid(fldPath, k, msg))
+		}
+		totalSize += (int64)(len(k)) + (int64)(len(v))
+	}
+
+	if totalSize > maxProvisionerParameterSize {
+		allErrs = append(allErrs, field.TooLong(fldPath, "", maxProvisionerParameterSize))
+	}
+	return allErrs
+}
