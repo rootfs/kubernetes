@@ -72,9 +72,14 @@ const annBindCompleted = "pv.kubernetes.io/bind-completed"
 // pre-bound). Value of this annotation does not matter.
 const annBoundByController = "pv.kubernetes.io/bound-by-controller"
 
-// annClass annotation represents a new field which instructs dynamic
-// provisioning to choose a particular storage class (aka profile).
-// Value of this annotation should be empty.
+// annClass annotation represents a new field:
+// - in PersistentVolumeClaim it represents required class to match.
+//   Only PersistentVolumes with the same class (i.e. annotation with the same
+//   value) can be bound to the claim. In case no such volume exists, the
+//   controller will provision a new one using StorageClass instance with
+//   the same name as the annotation value.
+// - in PersistentVolume it represents storage class to which the persistent
+//   volume belongs.
 const annClass = "volume.alpha.kubernetes.io/storage-class"
 
 // This annotation is added to a PV that has been dynamically provisioned by
@@ -1149,6 +1154,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 	// Add annBoundByController (used in deleting the volume)
 	setAnnotation(&volume.ObjectMeta, annBoundByController, "yes")
 	setAnnotation(&volume.ObjectMeta, annDynamicallyProvisioned, plugin.GetPluginName())
+	setAnnotation(&volume.ObjectMeta, annClass, getClaimClass(claim))
 
 	// Try to create the PV object several times
 	for i := 0; i < ctrl.createProvisionedPVRetryCount; i++ {

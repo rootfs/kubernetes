@@ -636,10 +636,13 @@ func newVolume(name, capacity, boundToClaimUID, boundToClaimName string, phase a
 	if len(annotations) > 0 {
 		volume.Annotations = make(map[string]string)
 		for _, a := range annotations {
-			if a != annDynamicallyProvisioned {
-				volume.Annotations[a] = "yes"
-			} else {
+			switch a {
+			case annDynamicallyProvisioned:
 				volume.Annotations[a] = mockPluginName
+			case annClass:
+				volume.Annotations[a] = "gold"
+			default:
+				volume.Annotations[a] = "yes"
 			}
 		}
 	}
@@ -710,7 +713,12 @@ func newClaim(name, claimUID, capacity, boundToVolume string, phase api.Persiste
 	if len(annotations) > 0 {
 		claim.Annotations = make(map[string]string)
 		for _, a := range annotations {
-			claim.Annotations[a] = "yes"
+			switch a {
+			case annClass:
+				claim.Annotations[a] = "gold"
+			default:
+				claim.Annotations[a] = "yes"
+			}
 		}
 	}
 	return &claim
