@@ -660,7 +660,7 @@ func (os *OpenStack) getVolume(diskName string) (volumes.Volume, error) {
 }
 
 // Create a volume of given size (in GiB)
-func (os *OpenStack) CreateVolume(name string, size int, tags *map[string]string) (volumeName string, err error) {
+func (os *OpenStack) CreateVolume(name string, size int, opt *map[string]string, tags *map[string]string) (volumeName string, err error) {
 
 	sClient, err := openstack.NewBlockStorageV1(os.provider, gophercloud.EndpointOpts{
 		Region: os.region,
@@ -674,6 +674,10 @@ func (os *OpenStack) CreateVolume(name string, size int, tags *map[string]string
 	opts := volumes.CreateOpts{
 		Name: name,
 		Size: size,
+	}
+	if opt != nil {
+		opts.VolumeType = (*opt)["VolumeType"]
+		opts.Availability = (*opt)["Availability"]
 	}
 	if tags != nil {
 		opts.Metadata = *tags
