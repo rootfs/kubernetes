@@ -123,3 +123,23 @@ func (util *azureDiskUtil) DetachDisk(b *azureDiskUnmounter, vmName string) erro
 	}
 	return nil
 }
+
+func (util *azureDiskUtil) GetLunByName(b *azureDiskMounter, vmName string) (int32, error) {
+	m, err := b.util.getAzureSecret(b.plugin.host, b.namespace, b.secretName)
+	if err != nil {
+		glog.Errorf("failed to get Azure secret and config")
+		return -1, err
+	}
+
+	var op azureDataDiskOp
+	op.action = QUERY
+	op.name = b.diskName
+	op.uri = b.diskUri
+	op.caching = compute.CachingTypes(b.cachingMode)
+	err = b.util.vmDataDisksOp(m, op, vmName)
+	if err != nil {
+		glog.Errorf("failed to attach disk %q to host %q", b.diskName, vmName)
+		return -1, err
+	}
+	return op.lun, nil
+}

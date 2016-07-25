@@ -48,6 +48,8 @@ type azureManager interface {
 	AttachDisk(mounter *azureDiskMounter, host string) error
 	// Detaches the disk from the host machine.
 	DetachDisk(unmounter *azureDiskUnmounter, host string) error
+	// Get the LUN number of the disk that is attached to the host
+	GetLunByName(b *azureDiskMounter, host string) (int32, error)
 }
 
 var _ volume.VolumePlugin = &azureDataDiskPlugin{}
