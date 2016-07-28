@@ -52,10 +52,14 @@ type azureDataDiskPlugin struct {
 type azureManager interface {
 	// Attaches the disk to the host machine.
 	AttachDisk(diskName, diskUri, vmName string, cachingMode compute.CachingTypes) error
-	// Detaches the disk from the host machine.
-	DetachDisk(lun int32, vmName string) error
+	// Detaches the disk, identified by lun, from the host machine.
+	DetachDiskByLun(lun int32, vmName string) error
+	// Detaches the disk, identified by disk name and uri, from the host machine.
+	DetachDiskByName(diskName, diskUri, vmName string) error
 	// Get the LUN number of the disk that is attached to the host
 	GetDiskLun(diskName, diskUri, vmName string) (int32, error)
+	// InstanceID returns the cloud provider ID of the specified instance.
+	InstanceID(name string) (string, error)
 }
 
 var _ volume.VolumePlugin = &azureDataDiskPlugin{}
@@ -76,7 +80,7 @@ func (plugin *azureDataDiskPlugin) GetPluginName() string {
 }
 
 func (plugin *azureDataDiskPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
-	volumeSource, _, err := getVolumeSource(spec)
+	volumeSource, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
 	}
@@ -106,7 +110,7 @@ func (plugin *azureDataDiskPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _
 func (plugin *azureDataDiskPlugin) newMounterInternal(spec *volume.Spec, namespace string, podUID types.UID, mounter mount.Interface) (volume.Mounter, error) {
 	// azures used directly in a pod have a ReadOnly flag set by the pod author.
 	// azures used as a PersistentVolume gets the ReadOnly flag indirectly through the persistent-claim volume used to mount the PV
-	azure, readOnly, err := getVolumeSource(spec)
+	azure, err := getVolumeSource(spec)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +138,7 @@ func (plugin *azureDataDiskPlugin) newMounterInternal(spec *volume.Spec, namespa
 			plugin:      plugin,
 		},
 		fsType:      fsType,
-		readOnly:    readOnly,
+		readOnly:    azure.ReadOnly,
 		diskMounter: &mount.SafeFormatAndMount{Interface: plugin.host.GetMounter(), Runner: exec.New()}}, nil
 }
 
@@ -330,20 +334,17 @@ func (c *azureDiskUnmounter) TearDownAt(dir string) error {
 	return nil
 }
 
-func getVolumeSource(spec *volume.Spec) (*api.AzureDiskVolumeSource, bool, error) {
-	var readOnly bool
+func getVolumeSource(spec *volume.Spec) (*api.AzureDiskVolumeSource, error) {
 	var azure *api.AzureDiskVolumeSource
 	if spec.Volume != nil && spec.Volume.AzureDisk != nil {
 		azure = spec.Volume.AzureDisk
-		readOnly = azure.ReadOnly
-		return azure, readOnly, nil
+		return azure, nil
 	} else {
 		azure = spec.PersistentVolume.Spec.AzureDisk
-		readOnly = spec.ReadOnly
-		return azure, readOnly, nil
+		return azure, nil
 	}
 
-	return nil, false, fmt.Errorf("Spec does not reference an Azure disk volume type")
+	return nil, fmt.Errorf("Spec does not reference an Azure disk volume type")
 }
 
 // Return cloud provider
