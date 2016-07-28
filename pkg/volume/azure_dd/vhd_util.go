@@ -99,7 +99,7 @@ func (util *azureDiskUtil) AttachDisk(b *azureDiskMounter, vmName string) error 
 		return err
 	}
 
-	err = cloud.AzureDataDisksOp(op, vmName)
+	err = cloud.AzureDataDisksOp(&op, vmName)
 	if err != nil {
 		glog.Errorf("failed to attach disk %q to host %q", b.diskName, vmName)
 		return err
@@ -117,10 +117,30 @@ func (util *azureDiskUtil) DetachDisk(b *azureDiskUnmounter, vmName string) erro
 		return err
 	}
 
-	err = cloud.AzureDataDisksOp(op, vmName)
+	err = cloud.AzureDataDisksOp(&op, vmName)
 	if err != nil {
 		glog.Errorf("failed to detach disk (lun=%q) to host %q", b.lun, vmName)
 		return err
 	}
 	return nil
+}
+
+func (util *azureDiskUtil) GetLunByName(b *azureDiskMounter, vmName string) (int32, error) {
+	var op az.AzureDataDiskOp
+	op.Action = az.QUERY
+	op.Name = b.diskName
+	op.Uri = b.diskUri
+
+	cloud, err := getCloudProvider(b.plugin.host.GetCloudProvider())
+	if err != nil {
+		glog.V(2).Infof("Error getting cloud provider: %v", err)
+		return 0, err
+	}
+
+	err = cloud.AzureDataDisksOp(&op, vmName)
+	if err != nil {
+		glog.Errorf("failed to detach disk (lun=%q) to host %q", b.lun, vmName)
+		return 0, err
+	}
+	return op.Lun, nil
 }

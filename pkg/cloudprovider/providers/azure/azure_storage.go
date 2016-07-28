@@ -18,10 +18,10 @@ package azure
 
 import (
 	"fmt"
-	
-	"k8s.io/kubernetes/pkg/cloudprovider"
+
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
 type diskOp int
@@ -46,13 +46,11 @@ type AzureDataDiskOp struct {
 	Caching compute.CachingTypes
 }
 
-
-
 // attach/detach/query vm's data disks
 // to attach: op.action = ATTACH, op.name and op.uri must be set
 // to detach: op.action = DETACH, op.lun must be set
 // to query:  op.action = QUERY, op.name or op.uri must be set, op.lun is returned
-func (az *Cloud) AzureDataDisksOp(op AzureDataDiskOp, vmName string) error {
+func (az *Cloud) AzureDataDisksOp(op *AzureDataDiskOp, vmName string) error {
 	vm, exists, err := az.getVirtualMachine(vmName)
 	if err != nil {
 		return err
