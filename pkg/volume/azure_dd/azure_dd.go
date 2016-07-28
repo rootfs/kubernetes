@@ -22,7 +22,10 @@ import (
 	"path"
 	"strconv"
 
+	"github.com/Azure/azure-sdk-for-go/arm/compute"
+
 	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
@@ -45,13 +48,14 @@ type azureDataDiskPlugin struct {
 }
 
 // Abstract interface to disk operations.
+// azure cloud provider should implement it
 type azureManager interface {
 	// Attaches the disk to the host machine.
-	AttachDisk(mounter *azureDiskMounter, host string) error
+	AttachDisk(diskName, diskUri, vmName string, cachingMode compute.CachingTypes) error
 	// Detaches the disk from the host machine.
-	DetachDisk(unmounter *azureDiskUnmounter, host string) error
+	DetachDisk(lun int32, vmName string) error
 	// Get the LUN number of the disk that is attached to the host
-	GetLunByName(b *azureDiskMounter, host string) (int32, error)
+	GetDiskLun(diskName, diskUri, vmName string) (int32, error)
 }
 
 var _ volume.VolumePlugin = &azureDataDiskPlugin{}
@@ -96,10 +100,10 @@ func (plugin *azureDataDiskPlugin) GetAccessModes() []api.PersistentVolumeAccess
 }
 
 func (plugin *azureDataDiskPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
-	return plugin.newMounterInternal(spec, pod.Namespace, pod.UID, &azureDiskUtil{}, plugin.host.GetMounter())
+	return plugin.newMounterInternal(spec, pod.Namespace, pod.UID, plugin.host.GetMounter())
 }
 
-func (plugin *azureDataDiskPlugin) newMounterInternal(spec *volume.Spec, namespace string, podUID types.UID, manager azureManager, mounter mount.Interface) (volume.Mounter, error) {
+func (plugin *azureDataDiskPlugin) newMounterInternal(spec *volume.Spec, namespace string, podUID types.UID, mounter mount.Interface) (volume.Mounter, error) {
 	// azures used directly in a pod have a ReadOnly flag set by the pod author.
 	// azures used as a PersistentVolume gets the ReadOnly flag indirectly through the persistent-claim volume used to mount the PV
 	azure, readOnly, err := getVolumeSource(spec)
@@ -126,7 +130,6 @@ func (plugin *azureDataDiskPlugin) newMounterInternal(spec *volume.Spec, namespa
 			cachingMode: cachingMode,
 			partition:   partition,
 			namespace:   namespace,
-			manager:     manager,
 			mounter:     mounter,
 			plugin:      plugin,
 		},
@@ -136,15 +139,14 @@ func (plugin *azureDataDiskPlugin) newMounterInternal(spec *volume.Spec, namespa
 }
 
 func (plugin *azureDataDiskPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
-	return plugin.newUnmounterInternal(volName, podUID, &azureDiskUtil{}, plugin.host.GetMounter())
+	return plugin.newUnmounterInternal(volName, podUID, plugin.host.GetMounter())
 }
 
-func (plugin *azureDataDiskPlugin) newUnmounterInternal(volName string, podUID types.UID, manager azureManager, mounter mount.Interface) (volume.Unmounter, error) {
+func (plugin *azureDataDiskPlugin) newUnmounterInternal(volName string, podUID types.UID, mounter mount.Interface) (volume.Unmounter, error) {
 	return &azureDiskUnmounter{
 		&azureDisk{
 			podUID:  podUID,
 			volName: volName,
-			manager: manager,
 			mounter: mounter,
 			plugin:  plugin,
 		},
@@ -161,7 +163,6 @@ type azureDisk struct {
 	partition   string
 	lun         int32
 	namespace   string
-	manager     azureManager
 	mounter     mount.Interface
 	plugin      *azureDataDiskPlugin
 	volume.MetricsNil
@@ -346,7 +347,7 @@ func getVolumeSource(spec *volume.Spec) (*api.AzureDiskVolumeSource, bool, error
 }
 
 // Return cloud provider
-func getCloudProvider(cloudProvider cloudprovider.Interface) (*azure.Cloud, error) {
+func getAzureDiskManager(cloudProvider cloudprovider.Interface) (azureManager, error) {
 	azureCloudProvider, ok := cloudProvider.(*azure.Cloud)
 	if !ok || azureCloudProvider == nil {
 		return nil, fmt.Errorf("Failed to get Azure Cloud Provider. GetCloudProvider returned %v instead", cloudProvider)

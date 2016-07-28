@@ -24,9 +24,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/arm/compute"
-	"github.com/golang/glog"
-	az "k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	"k8s.io/kubernetes/pkg/util/exec"
 )
 
@@ -83,64 +80,4 @@ func findDiskByLun(lun int, io ioHandler) string {
 		}
 	}
 	return ""
-}
-
-type azureDiskUtil struct{}
-
-func (util *azureDiskUtil) AttachDisk(b *azureDiskMounter, vmName string) error {
-	var op az.AzureDataDiskOp
-	op.Action = az.ATTACH
-	op.Name = b.diskName
-	op.Uri = b.diskUri
-	op.Caching = compute.CachingTypes(b.cachingMode)
-	cloud, err := getCloudProvider(b.plugin.host.GetCloudProvider())
-	if err != nil {
-		glog.V(2).Infof("Error getting cloud provider: %v", err)
-		return err
-	}
-
-	err = cloud.AzureDataDisksOp(&op, vmName)
-	if err != nil {
-		glog.Errorf("failed to attach disk %q to host %q", b.diskName, vmName)
-		return err
-	}
-	return nil
-}
-
-func (util *azureDiskUtil) DetachDisk(b *azureDiskUnmounter, vmName string) error {
-	var op az.AzureDataDiskOp
-	op.Action = az.DETACH
-	op.Lun = b.lun
-	cloud, err := getCloudProvider(b.plugin.host.GetCloudProvider())
-	if err != nil {
-		glog.V(2).Infof("Error getting cloud provider: %v", err)
-		return err
-	}
-
-	err = cloud.AzureDataDisksOp(&op, vmName)
-	if err != nil {
-		glog.Errorf("failed to detach disk (lun=%q) to host %q", b.lun, vmName)
-		return err
-	}
-	return nil
-}
-
-func (util *azureDiskUtil) GetLunByName(b *azureDiskMounter, vmName string) (int32, error) {
-	var op az.AzureDataDiskOp
-	op.Action = az.QUERY
-	op.Name = b.diskName
-	op.Uri = b.diskUri
-
-	cloud, err := getCloudProvider(b.plugin.host.GetCloudProvider())
-	if err != nil {
-		glog.V(2).Infof("Error getting cloud provider: %v", err)
-		return 0, err
-	}
-
-	err = cloud.AzureDataDisksOp(&op, vmName)
-	if err != nil {
-		glog.Errorf("failed to detach disk (lun=%q) to host %q", b.lun, vmName)
-		return 0, err
-	}
-	return op.Lun, nil
 }
