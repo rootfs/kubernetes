@@ -277,7 +277,6 @@ type PersistentVolumeSource struct {
 	VsphereVolume *VsphereVirtualDiskVolumeSource `json:"vsphereVolume,omitempty"`
 	// AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
 	AzureDisk *AzureDiskVolumeSource `json:"azureDisk,omitempty"`
-
 }
 
 type PersistentVolumeClaimVolumeSource struct {
@@ -757,17 +756,12 @@ const (
 
 // AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
 type AzureDiskVolumeSource struct {
-	// the name of secret that contains Azure Client ID, Client Secret, Subscription ID, tenant ID, and Azure Resource Group (ARM) name
-	SecretName string `json:"secretName"`
 	// Data Disk Name
 	DiskName string `json:"diskName"`
 	// Data Disk URI
-	DataDiskURI string `json:"diskURI"`
+	DataDiskURI string `json:"diskURI,omitempty"`
 	// Host Caching mode: None, Read Only, Read Write.
 	CachingMode AzureDataDiskCachingMode `json:"cachingMode,omitempty"`
-	// The partition in the volume to mount.
-	// If omitted, the default is to mount by volume name.
-	Partition int32 `json:"partition,omitempty"`
 	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.

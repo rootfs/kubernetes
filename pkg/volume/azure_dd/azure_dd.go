@@ -118,21 +118,14 @@ func (plugin *azureDataDiskPlugin) newMounterInternal(spec *volume.Spec, namespa
 	fsType := azure.FSType
 	diskName := azure.DiskName
 	diskUri := azure.DataDiskURI
-	secretName := azure.SecretName
 	cachingMode := azure.CachingMode
-	partition := ""
-	if azure.Partition != 0 {
-		partition = strconv.Itoa(int(azure.Partition))
-	}
 	return &azureDiskMounter{
 		azureDisk: &azureDisk{
 			podUID:      podUID,
 			volName:     spec.Name(),
-			secretName:  secretName,
 			diskName:    diskName,
 			diskUri:     diskUri,
 			cachingMode: cachingMode,
-			partition:   partition,
 			namespace:   namespace,
 			mounter:     mounter,
 			plugin:      plugin,
@@ -160,12 +153,9 @@ func (plugin *azureDataDiskPlugin) newUnmounterInternal(volName string, podUID t
 type azureDisk struct {
 	volName     string
 	podUID      types.UID
-	secretName  string
 	diskName    string
 	diskUri     string
 	cachingMode api.AzureDataDiskCachingMode
-	partition   string
-	lun         int32
 	namespace   string
 	mounter     mount.Interface
 	plugin      *azureDataDiskPlugin

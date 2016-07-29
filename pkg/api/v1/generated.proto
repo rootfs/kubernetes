@@ -91,30 +91,23 @@ message AvoidPods {
 
 // AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
 message AzureDiskVolumeSource {
-  // the name of secret that contains Azure Client ID, Client Secret, Subscription ID, tenant ID, and Azure Resource Group (ARM) name
-  optional string secretName = 1;
-
   // Data Disk Name
-  optional string diskName = 2;
+  optional string diskName = 1;
 
   // Data Disk URI
-  optional string diskURI = 3;
+  optional string diskURI = 2;
 
   // Host Caching mode: None, Read Only, Read Write.
-  optional string cachingMode = 4;
-
-  // The partition in the volume to mount.
-  // If omitted, the default is to mount by volume name.
-  optional int32 partition = 5;
+  optional string cachingMode = 3;
 
   // Filesystem type to mount.
   // Must be a filesystem type supported by the host operating system.
   // Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
-  optional string fsType = 6;
+  optional string fsType = 4;
 
   // Defaults to false (read/write). ReadOnly here will force
   // the ReadOnly setting in VolumeMounts.
-  optional bool readOnly = 7;
+  optional bool readOnly = 5;
 }
 
 // AzureFile represents an Azure File Service mount on the host and bind mount to the pod.

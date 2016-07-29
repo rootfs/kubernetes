@@ -495,11 +495,9 @@ func Convert_api_AvoidPods_To_v1_AvoidPods(in *api.AvoidPods, out *AvoidPods, s 
 }
 
 func autoConvert_v1_AzureDiskVolumeSource_To_api_AzureDiskVolumeSource(in *AzureDiskVolumeSource, out *api.AzureDiskVolumeSource, s conversion.Scope) error {
-	out.SecretName = in.SecretName
 	out.DiskName = in.DiskName
 	out.DataDiskURI = in.DataDiskURI
 	out.CachingMode = api.AzureDataDiskCachingMode(in.CachingMode)
-	out.Partition = in.Partition
 	out.FSType = in.FSType
 	out.ReadOnly = in.ReadOnly
 	return nil
@@ -510,11 +508,9 @@ func Convert_v1_AzureDiskVolumeSource_To_api_AzureDiskVolumeSource(in *AzureDisk
 }
 
 func autoConvert_api_AzureDiskVolumeSource_To_v1_AzureDiskVolumeSource(in *api.AzureDiskVolumeSource, out *AzureDiskVolumeSource, s conversion.Scope) error {
-	out.SecretName = in.SecretName
 	out.DiskName = in.DiskName
 	out.DataDiskURI = in.DataDiskURI
 	out.CachingMode = AzureDataDiskCachingMode(in.CachingMode)
-	out.Partition = in.Partition
 	out.FSType = in.FSType
 	out.ReadOnly = in.ReadOnly
 	return nil

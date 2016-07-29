@@ -866,24 +866,19 @@ const (
 
 // AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
 type AzureDiskVolumeSource struct {
-	// the name of secret that contains Azure Client ID, Client Secret, Subscription ID, tenant ID, and Azure Resource Group (ARM) name
-	SecretName string `json:"secretName" protobuf:"bytes,1,opt,name=secretName"`
 	// Data Disk Name
-	DiskName string `json:"diskName" protobuf:"bytes,2,opt,name=diskName"`
+	DiskName string `json:"diskName" protobuf:"bytes,1,opt,name=diskName"`
 	// Data Disk URI
-	DataDiskURI string `json:"diskURI" protobuf:"bytes,3,opt,name=diskURI"`
+	DataDiskURI string `json:"diskURI,omitempty" protobuf:"bytes,2,opt,name=diskURI"`
 	// Host Caching mode: None, Read Only, Read Write.
-	CachingMode AzureDataDiskCachingMode `json:"cachingMode,omitempty" protobuf:"bytes,4,opt,name=cachingMode,casttype=AzureDataDiskCachingMode"`
-	// The partition in the volume to mount.
-	// If omitted, the default is to mount by volume name.
-	Partition int32 `json:"partition,omitempty" protobuf:"varint,5,opt,name=partition"`
+	CachingMode AzureDataDiskCachingMode `json:"cachingMode,omitempty" protobuf:"bytes,3,opt,name=cachingMode,casttype=AzureDataDiskCachingMode"`
 	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
-	FSType string `json:"fsType,omitempty" protobuf:"bytes,6,opt,name=fsType"`
+	FSType string `json:"fsType,omitempty" protobuf:"bytes,4,opt,name=fsType"`
 	// Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
-	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,7,opt,name=readOnly"`
+	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,5,opt,name=readOnly"`
 }
 
 // Adapts a ConfigMap into a volume.

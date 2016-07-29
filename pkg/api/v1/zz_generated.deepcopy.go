@@ -270,11 +270,9 @@ func DeepCopy_v1_AzureDiskVolumeSource(in interface{}, out interface{}, c *conve
 	{
 		in := in.(*AzureDiskVolumeSource)
 		out := out.(*AzureDiskVolumeSource)
-		out.SecretName = in.SecretName
 		out.DiskName = in.DiskName
 		out.DataDiskURI = in.DataDiskURI
 		out.CachingMode = in.CachingMode
-		out.Partition = in.Partition
 		out.FSType = in.FSType
 		out.ReadOnly = in.ReadOnly
 		return nil

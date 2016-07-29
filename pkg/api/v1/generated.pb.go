@@ -974,28 +974,21 @@ func (m *AzureDiskVolumeSource) MarshalTo(data []byte) (int, error) {
 	_ = l
 	data[i] = 0xa
 	i++
-	i = encodeVarintGenerated(data, i, uint64(len(m.SecretName)))
-	i += copy(data[i:], m.SecretName)
-	data[i] = 0x12
-	i++
 	i = encodeVarintGenerated(data, i, uint64(len(m.DiskName)))
 	i += copy(data[i:], m.DiskName)
-	data[i] = 0x1a
+	data[i] = 0x12
 	i++
 	i = encodeVarintGenerated(data, i, uint64(len(m.DataDiskURI)))
 	i += copy(data[i:], m.DataDiskURI)
-	data[i] = 0x22
+	data[i] = 0x1a
 	i++
 	i = encodeVarintGenerated(data, i, uint64(len(m.CachingMode)))
 	i += copy(data[i:], m.CachingMode)
-	data[i] = 0x28
-	i++
-	i = encodeVarintGenerated(data, i, uint64(m.Partition))
-	data[i] = 0x32
+	data[i] = 0x22
 	i++
 	i = encodeVarintGenerated(data, i, uint64(len(m.FSType)))
 	i += copy(data[i:], m.FSType)
-	data[i] = 0x38
+	data[i] = 0x28
 	i++
 	if m.ReadOnly {
 		data[i] = 1
@@ -7867,15 +7860,12 @@ func (m *AvoidPods) Size() (n int) {
 func (m *AzureDiskVolumeSource) Size() (n int) {
 	var l int
 	_ = l
-	l = len(m.SecretName)
-	n += 1 + l + sovGenerated(uint64(l))
 	l = len(m.DiskName)
 	n += 1 + l + sovGenerated(uint64(l))
 	l = len(m.DataDiskURI)
 	n += 1 + l + sovGenerated(uint64(l))
 	l = len(m.CachingMode)
 	n += 1 + l + sovGenerated(uint64(l))
-	n += 1 + sovGenerated(uint64(m.Partition))
 	l = len(m.FSType)
 	n += 1 + l + sovGenerated(uint64(l))
 	n += 2
@@ -10440,11 +10430,9 @@ func (this *AzureDiskVolumeSource) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&AzureDiskVolumeSource{`,
-		`SecretName:` + fmt.Sprintf("%v", this.SecretName) + `,`,
 		`DiskName:` + fmt.Sprintf("%v", this.DiskName) + `,`,
 		`DataDiskURI:` + fmt.Sprintf("%v", this.DataDiskURI) + `,`,
 		`CachingMode:` + fmt.Sprintf("%v", this.CachingMode) + `,`,
-		`Partition:` + fmt.Sprintf("%v", this.Partition) + `,`,
 		`FSType:` + fmt.Sprintf("%v", this.FSType) + `,`,
 		`ReadOnly:` + fmt.Sprintf("%v", this.ReadOnly) + `,`,
 		`}`,
@@ -13061,35 +13049,6 @@ func (m *AzureDiskVolumeSource) Unmarshal(data []byte) error {
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field SecretName", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := data[iNdEx]
-				iNdEx++
-				stringLen |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.SecretName = string(data[iNdEx:postIndex])
-			iNdEx = postIndex
-		case 2:
-			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field DiskName", wireType)
 			}
 			var stringLen uint64
@@ -13117,7 +13076,7 @@ func (m *AzureDiskVolumeSource) Unmarshal(data []byte) error {
 			}
 			m.DiskName = string(data[iNdEx:postIndex])
 			iNdEx = postIndex
-		case 3:
+		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field DataDiskURI", wireType)
 			}
@@ -13146,7 +13105,7 @@ func (m *AzureDiskVolumeSource) Unmarshal(data []byte) error {
 			}
 			m.DataDiskURI = string(data[iNdEx:postIndex])
 			iNdEx = postIndex
-		case 4:
+		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field CachingMode", wireType)
 			}
@@ -13175,26 +13134,7 @@ func (m *AzureDiskVolumeSource) Unmarshal(data []byte) error {
 			}
 			m.CachingMode = AzureDataDiskCachingMode(data[iNdEx:postIndex])
 			iNdEx = postIndex
-		case 5:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Partition", wireType)
-			}
-			m.Partition = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := data[iNdEx]
-				iNdEx++
-				m.Partition |= (int32(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-		case 6:
+		case 4:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field FSType", wireType)
 			}
@@ -13223,7 +13163,7 @@ func (m *AzureDiskVolumeSource) Unmarshal(data []byte) error {
 			}
 			m.FSType = string(data[iNdEx:postIndex])
 			iNdEx = postIndex
-		case 7:
+		case 5:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field ReadOnly", wireType)
 			}
