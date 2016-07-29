@@ -19,6 +19,7 @@ package azure_dd
 import (
 	"fmt"
 	"os"
+	"path"
 	"strconv"
 	"time"
 
@@ -211,17 +212,51 @@ func (plugin *azureDataDiskPlugin) NewDetacher() (volume.Detacher, error) {
 	}, nil
 }
 
-func (detacher *azureDiskDetacher) Detach(deviceMountPath string, hostName string) error {
-	//lun := findLunByDiskPath(deviceMountPath, &osIOHandler{})
-	return nil
+func (detacher *azureDiskDetacher) Detach(dev string, hostName string) error {
+	if dev == "" {
+		return fmt.Errorf("invalid dev to detach: %q", dev)
+	}
+	instanceid, err := detacher.manager.InstanceID(hostName)
+	if err != nil {
+		return fmt.Errorf("failed to get azure instance id for host %q", hostName)
+	}
+
+	err = detacher.manager.DetachDiskByName(dev, "", instanceid)
+	if err != nil {
+		glog.V(2).Infof("failed to detach azure disk %q", dev)
+	}
+	return err
 }
 
 func (detacher *azureDiskDetacher) WaitForDetach(devicePath string, timeout time.Duration) error {
-	return nil
+	ticker := time.NewTicker(checkSleepDuration)
+	defer ticker.Stop()
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			glog.V(5).Infof("Checking device %q is detached.", devicePath)
+			if pathExists, err := pathExists(devicePath); err != nil {
+				return fmt.Errorf("Error checking if device path exists: %v", err)
+			} else if !pathExists {
+				return nil
+			}
+		case <-timer.C:
+			return fmt.Errorf("Timeout reached; Device %v is still attached", devicePath)
+		}
+	}
 }
 
 func (detacher *azureDiskDetacher) UnmountDevice(deviceMountPath string) error {
+	volume := path.Base(deviceMountPath)
+	if err := unmountPDAndRemoveGlobalPath(deviceMountPath, detacher.mounter); err != nil {
+		glog.Errorf("Error unmounting %q: %v", volume, err)
+	}
+
 	return nil
+
 }
 
 // Checks if the specified path exists
@@ -234,4 +269,17 @@ func pathExists(path string) (bool, error) {
 	} else {
 		return false, err
 	}
+}
+
+// Unmount the global mount path, which should be the only one, and delete it.
+func unmountPDAndRemoveGlobalPath(globalMountPath string, mounter mount.Interface) error {
+	if pathExists, pathErr := pathExists(globalMountPath); pathErr != nil {
+		return fmt.Errorf("Error checking if path exists: %v", pathErr)
+	} else if !pathExists {
+		glog.V(5).Infof("Warning: Unmount skipped because path does not exist: %v", globalMountPath)
+		return nil
+	}
+	err := mounter.Unmount(globalMountPath)
+	os.Remove(globalMountPath)
+	return err
 }
