@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"strconv"
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
 
