@@ -29,16 +29,12 @@ import (
 
 type ioHandler interface {
 	ReadDir(dirname string) ([]os.FileInfo, error)
-	ReadFile(filename string) ([]byte, error)
 }
 
 type osIOHandler struct{}
 
 func (handler *osIOHandler) ReadDir(dirname string) ([]os.FileInfo, error) {
 	return ioutil.ReadDir(dirname)
-}
-func (handler *osIOHandler) ReadFile(filename string) ([]byte, error) {
-	return ioutil.ReadFile(filename)
 }
 
 // given a LUN find the VHD device path like /dev/sdb

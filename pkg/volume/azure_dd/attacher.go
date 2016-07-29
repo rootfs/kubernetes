@@ -18,12 +18,14 @@ package azure_dd
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -98,17 +100,14 @@ func (attacher *azureDiskAttacher) Attach(spec *volume.Spec, hostName string) (s
 	// return LUN for now and let node find the device later
 	lunStr := ""
 	if lun >= 0 {
-		lunStr, err = strconv.Itoa(int(lun))
-		if err != nil {
-			return "", err
-		}
+		lunStr = strconv.Itoa(int(lun))
 	}
 
 	return lunStr, err
 }
 
 func (attacher *azureDiskAttacher) WaitForAttach(spec *volume.Spec, dev string, timeout time.Duration) (string, error) {
-	volumeSource, _, err := getVolumeSource(spec)
+	volumeSource, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
 	}
@@ -121,7 +120,7 @@ func (attacher *azureDiskAttacher) WaitForAttach(spec *volume.Spec, dev string, 
 	if err != nil {
 		return "", fmt.Errorf("WaitForAttach: wrong lun %q", dev)
 	}
-	devicePath := findDiskByLun(lun)
+	devicePath := findDiskByLun(lun, &osIOHandler{})
 	if devicePath == "" {
 		return "", fmt.Errorf("cannot find device for lun %q", dev)
 	}
@@ -150,12 +149,12 @@ func (attacher *azureDiskAttacher) WaitForAttach(spec *volume.Spec, dev string, 
 
 func (attacher *azureDiskAttacher) GetDeviceMountPath(
 	spec *volume.Spec) (string, error) {
-	volumeSource, _, err := getVolumeSource(spec)
+	volumeSource, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
 	}
 
-	return makeGlobalPDName(attacher.host, volumeSource.DiskName), nil
+	return makeGlobalPDPath(attacher.host, volumeSource.DiskName), nil
 
 }
 
@@ -173,13 +172,13 @@ func (attacher *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath str
 		}
 	}
 
-	volumeSource, readOnly, err := getVolumeSource(spec)
+	volumeSource, err := getVolumeSource(spec)
 	if err != nil {
 		return err
 	}
 
 	options := []string{}
-	if readOnly {
+	if spec.ReadOnly {
 		options = append(options, "ro")
 	}
 	if notMnt {
@@ -213,7 +212,7 @@ func (plugin *azureDataDiskPlugin) NewDetacher() (volume.Detacher, error) {
 }
 
 func (detacher *azureDiskDetacher) Detach(deviceMountPath string, hostName string) error {
-	lun := findLunByDiskPath(deviceMountPath)
+	//lun := findLunByDiskPath(deviceMountPath, &osIOHandler{})
 	return nil
 }
 
