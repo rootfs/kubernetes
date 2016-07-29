@@ -43,6 +43,7 @@ func (handler *osIOHandler) ReadFile(filename string) ([]byte, error) {
 
 // given a LUN find the VHD device path like /dev/sdb
 // VHD disks under sysfs are like /sys/bus/scsi/devices/3:0:1:0
+// return empty string if no disk is found
 func findDiskByLun(lun int, io ioHandler) string {
 	sys_path := "/sys/bus/scsi/devices"
 	if dirs, err := io.ReadDir(sys_path); err == nil {
@@ -80,4 +81,45 @@ func findDiskByLun(lun int, io ioHandler) string {
 		}
 	}
 	return ""
+}
+
+// given a device path /dev/sdx, find the LUN
+// return -1 if no matching lun found, otherwise return >= 0
+func findLunByDiskPath(devPath string, io ioHandler) int {
+	sys_path := "/sys/bus/scsi/devices"
+	if dirs, err := io.ReadDir(sys_path); err == nil {
+		for _, f := range dirs {
+			name := f.Name()
+			// look for path like /sys/bus/scsi/devices/3:0:1:0
+			arr := strings.Split(name, ":")
+			if len(arr) < 4 {
+				continue
+			}
+			target, err := strconv.Atoi(arr[0])
+			// skip targets 0-2, which are used by OS disks
+			if err == nil && target > 2 {
+				lun, err := strconv.Atoi(arr[2])
+				if err == nil {
+					// read vendor and model to ensure it is a VHD disk
+					vendor := path.Join(sys_path, name, "vendor")
+					model := path.Join(sys_path, name, "model")
+					exe := exec.New()
+					out, err := exe.Command("cat", vendor, model).CombinedOutput()
+					if err != nil {
+						continue
+					}
+					matched, err := regexp.MatchString("^MSFT[ ]{0,}\nVIRTUAL DISK[ ]{0,}\n$", strings.ToUpper(string(out)))
+					if err != nil || !matched {
+						continue
+					}
+					if dev, err := io.ReadDir(path.Join(sys_path, name, "block")); err == nil {
+						if "/dev/"+dev[0].Name() == devPath {
+							return lun
+						}
+					}
+				}
+			}
+		}
+	}
+	return -1
 }

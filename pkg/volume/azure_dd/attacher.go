@@ -18,6 +18,7 @@ package azure_dd
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
@@ -72,7 +73,7 @@ func (attacher *azureDiskAttacher) Attach(spec *volume.Spec, hostName string) (s
 
 	if err == nil {
 		// Volume is already attached to node.
-		glog.Infof("Attach operation is successful. volume %q is already attached to node %q at lun %d.", volumeSource.DataDiskURI, instanceid, lun)
+		glog.Infof("Attach operation is successful. volume %q is already attached to node %q at lun %d.", volumeSource.DiskName, instanceid, lun)
 
 	} else {
 		err = attacher.manager.AttachDisk(volumeSource.DiskName, volumeSource.DataDiskURI, instanceid, compute.CachingTypes(volumeSource.CachingMode))
@@ -87,48 +88,132 @@ func (attacher *azureDiskAttacher) Attach(spec *volume.Spec, hostName string) (s
 			// should reach here
 			// detach disk and return
 			attacher.manager.DetachDiskByName(volumeSource.DiskName, volumeSource.DataDiskURI, instanceid)
-			return "", fmt.Errorf("failed to get LUN after attach: volume %q node %q", volumeSource.DataDiskURI, instanceid)
+			return "", fmt.Errorf("failed to get LUN after attach: volume %q node %q", volumeSource.DiskName, instanceid)
 		} else {
 			glog.Infof("Attach volume %q to instance %q failed with %v", volumeSource.DataDiskURI, instanceid, err)
-			return "", fmt.Errorf("Attach volume %q to instance %q failed with %v", volumeSource.DataDiskURI, instanceid, err)
+			return "", fmt.Errorf("Attach volume %q to instance %q failed with %v", volumeSource.DiskName, instanceid, err)
+		}
+	}
+	// azure VM property doesn't return device path
+	// return LUN for now and let node find the device later
+	lunStr := ""
+	if lun >= 0 {
+		lunStr, err = strconv.Itoa(int(lun))
+		if err != nil {
+			return "", err
 		}
 	}
 
-	devicePath := findDiskByLun(int(lun), &osIOHandler{})
-	if devicePath != "" {
-		glog.Infof("Failed to find LUN %d on instance %q", lun, instanceid)
-		return "", fmt.Errorf("Failed to find LUN %d on instance %q", lun, instanceid)
-	}
-
-	return devicePath, err
+	return lunStr, err
 }
 
-func (attacher *azureDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath string, timeout time.Duration) (string, error) {
-	return "", nil
+func (attacher *azureDiskAttacher) WaitForAttach(spec *volume.Spec, dev string, timeout time.Duration) (string, error) {
+	volumeSource, _, err := getVolumeSource(spec)
+	if err != nil {
+		return "", err
+	}
+
+	if dev == "" {
+		return "", fmt.Errorf("WaitForAttach failed for Azure disk %q: devicePath is empty.", volumeSource.DiskName)
+	}
+	glog.V(4).Infof("wait for lun %q", dev)
+	lun, err := strconv.Atoi(dev)
+	if err != nil {
+		return "", fmt.Errorf("WaitForAttach: wrong lun %q", dev)
+	}
+	devicePath := findDiskByLun(lun)
+	if devicePath == "" {
+		return "", fmt.Errorf("cannot find device for lun %q", dev)
+	}
+	ticker := time.NewTicker(checkSleepDuration)
+	defer ticker.Stop()
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			glog.V(5).Infof("Checking Azure disk %q is attached.", volumeSource.DiskName)
+			exists, err := pathExists(devicePath)
+			if exists && err == nil {
+				glog.Infof("Successfully found attached Azure disk %q.", volumeSource.DiskName)
+				return devicePath, nil
+			} else {
+				//Log error, if any, and continue checking periodically
+				glog.Errorf("Error Stat Azure disk (%q) is attached: %v", volumeSource.DiskName, err)
+			}
+		case <-timer.C:
+			return "", fmt.Errorf("Could not find attached Azure disk %q. Timeout waiting for mount paths to be created.", volumeSource.DiskName)
+		}
+	}
 }
 
 func (attacher *azureDiskAttacher) GetDeviceMountPath(
 	spec *volume.Spec) (string, error) {
-	return "", nil
+	volumeSource, _, err := getVolumeSource(spec)
+	if err != nil {
+		return "", err
+	}
+
+	return makeGlobalPDName(attacher.host, volumeSource.DiskName), nil
+
 }
 
 func (attacher *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+	mounter := attacher.host.GetMounter()
+	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			if err := os.MkdirAll(deviceMountPath, 0750); err != nil {
+				return err
+			}
+			notMnt = true
+		} else {
+			return err
+		}
+	}
+
+	volumeSource, readOnly, err := getVolumeSource(spec)
+	if err != nil {
+		return err
+	}
+
+	options := []string{}
+	if readOnly {
+		options = append(options, "ro")
+	}
+	if notMnt {
+		diskMounter := &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()}
+		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, volumeSource.FSType, options)
+		if err != nil {
+			os.Remove(deviceMountPath)
+			return err
+		}
+	}
 	return nil
 }
 
 type azureDiskDetacher struct {
 	mounter mount.Interface
+	manager azureManager
 }
 
 var _ volume.Detacher = &azureDiskDetacher{}
 
 func (plugin *azureDataDiskPlugin) NewDetacher() (volume.Detacher, error) {
+	azure, err := getAzureDiskManager(plugin.host.GetCloudProvider())
+	if err != nil {
+		return nil, err
+	}
+
 	return &azureDiskDetacher{
 		mounter: plugin.host.GetMounter(),
+		manager: azure,
 	}, nil
 }
 
 func (detacher *azureDiskDetacher) Detach(deviceMountPath string, hostName string) error {
+	lun := findLunByDiskPath(deviceMountPath)
 	return nil
 }
 
@@ -138,4 +223,16 @@ func (detacher *azureDiskDetacher) WaitForDetach(devicePath string, timeout time
 
 func (detacher *azureDiskDetacher) UnmountDevice(deviceMountPath string) error {
 	return nil
+}
+
+// Checks if the specified path exists
+func pathExists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	} else if os.IsNotExist(err) {
+		return false, nil
+	} else {
+		return false, err
+	}
 }
