@@ -45,8 +45,10 @@ const (
 )
 
 func (plugin *azureDataDiskPlugin) NewAttacher() (volume.Attacher, error) {
+	glog.Infof("debug: new attacher")
 	azure, err := getAzureDiskManager(plugin.host.GetCloudProvider())
 	if err != nil {
+		glog.Infof("failed to get azure provider")
 		return nil, err
 	}
 
@@ -57,12 +59,15 @@ func (plugin *azureDataDiskPlugin) NewAttacher() (volume.Attacher, error) {
 }
 
 func (attacher *azureDiskAttacher) Attach(spec *volume.Spec, hostName string) (string, error) {
+	glog.Infof("debug: attach")
 	volumeSource, err := getVolumeSource(spec)
 	if err != nil {
+		glog.Infof("failed to get azure disk spec")
 		return "", err
 	}
 	instanceid, err := attacher.manager.InstanceID(hostName)
 	if err != nil {
+		glog.Infof("failed to get azure instance id")
 		return "", fmt.Errorf("failed to get azure instance id for host %q", hostName)
 	}
 
@@ -79,6 +84,7 @@ func (attacher *azureDiskAttacher) Attach(spec *volume.Spec, hostName string) (s
 		glog.Infof("Attach operation is successful. volume %q is already attached to node %q at lun %d.", volumeSource.DiskName, instanceid, lun)
 
 	} else {
+		glog.Infof("debug: attaching disk")
 		err = attacher.manager.AttachDisk(volumeSource.DiskName, volumeSource.DataDiskURI, instanceid, compute.CachingTypes(volumeSource.CachingMode))
 		if err == nil {
 			glog.Infof("Attach operation successful: volume %q attached to node %q.", volumeSource.DataDiskURI, instanceid)
@@ -90,6 +96,7 @@ func (attacher *azureDiskAttacher) Attach(spec *volume.Spec, hostName string) (s
 			}
 			// should reach here
 			// detach disk and return
+			glog.Infof("detach disk %q", volumeSource.DiskName)
 			attacher.manager.DetachDiskByName(volumeSource.DiskName, volumeSource.DataDiskURI, instanceid)
 			return "", fmt.Errorf("failed to get LUN after attach: volume %q node %q", volumeSource.DiskName, instanceid)
 		} else {
@@ -103,7 +110,7 @@ func (attacher *azureDiskAttacher) Attach(spec *volume.Spec, hostName string) (s
 	if lun >= 0 {
 		lunStr = strconv.Itoa(int(lun))
 	}
-
+	glog.Infof("debug: attach lun %d", lun)
 	return lunStr, err
 }
 
