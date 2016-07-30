@@ -713,7 +713,7 @@ func printDownwardAPIVolumeSource(d *api.DownwardAPIVolumeSource, out io.Writer)
 }
 
 func printAzureDiskVolumeSource(d *api.AzureDiskVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tAzureDisk (an Azure Data Disk mount on the host and bind mount to the pod"+
+	fmt.Fprintf(out, "    Type:\tAzureDisk (an Azure Data Disk mount on the host and bind mount to the pod)\n"+
 		"    DiskName:\t%v\n"+
 		"    DiskURI:\t%v\n" +  
 		"    FSType:\t%v\n"+
