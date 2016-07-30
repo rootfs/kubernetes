@@ -36,7 +36,8 @@ func (az *Cloud) AttachDisk(diskName, diskUri, vmName string, cachingMode comput
 			Vhd: &compute.VirtualHardDisk{
 				URI: &diskUri,
 			},
-			Caching: cachingMode,
+			Caching:      cachingMode,
+			CreateOption: "attach",
 		})
 
 	newVM := compute.VirtualMachine{
