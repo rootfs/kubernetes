@@ -115,6 +115,7 @@ func (attacher *azureDiskAttacher) Attach(spec *volume.Spec, hostName string) (s
 }
 
 func (attacher *azureDiskAttacher) WaitForAttach(spec *volume.Spec, dev string, timeout time.Duration) (string, error) {
+	glog.Infof("debug: wait for attach")
 	volumeSource, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
@@ -157,6 +158,7 @@ func (attacher *azureDiskAttacher) WaitForAttach(spec *volume.Spec, dev string, 
 
 func (attacher *azureDiskAttacher) GetDeviceMountPath(
 	spec *volume.Spec) (string, error) {
+	glog.Infof("debug: get device mount path")
 	volumeSource, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
@@ -167,6 +169,7 @@ func (attacher *azureDiskAttacher) GetDeviceMountPath(
 }
 
 func (attacher *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+	glog.Infof("debug: mount device")
 	mounter := attacher.host.GetMounter()
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
