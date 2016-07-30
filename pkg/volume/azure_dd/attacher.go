@@ -70,6 +70,9 @@ func (attacher *azureDiskAttacher) Attach(spec *volume.Spec, hostName string) (s
 		glog.Infof("failed to get azure instance id")
 		return "", fmt.Errorf("failed to get azure instance id for host %q", hostName)
 	}
+	if ind := strings.LastIndex(instanceid, "/"); ind >= 0 {
+		instanceid = instanceid[(ind + 1):]
+	}
 
 	lun, err := attacher.manager.GetDiskLun(volumeSource.DiskName, volumeSource.DataDiskURI, instanceid)
 	if err == cloudprovider.InstanceNotFound {
@@ -229,6 +232,9 @@ func (detacher *azureDiskDetacher) Detach(dev string, hostName string) error {
 	instanceid, err := detacher.manager.InstanceID(hostName)
 	if err != nil {
 		return fmt.Errorf("failed to get azure instance id for host %q", hostName)
+	}
+	if ind := strings.LastIndex(instanceid, "/"); ind >= 0 {
+		instanceid = instanceid[(ind + 1):]
 	}
 
 	err = detacher.manager.DetachDiskByName(dev, "", instanceid)
