@@ -218,6 +218,7 @@ func (plugin *azureDataDiskPlugin) NewDetacher() (volume.Detacher, error) {
 }
 
 func (detacher *azureDiskDetacher) Detach(dev string, hostName string) error {
+	glog.Infof("debug: detach %v", dev)
 	if dev == "" {
 		return fmt.Errorf("invalid dev to detach: %q", dev)
 	}
@@ -237,6 +238,7 @@ func (detacher *azureDiskDetacher) Detach(dev string, hostName string) error {
 }
 
 func (detacher *azureDiskDetacher) WaitForDetach(devicePath string, timeout time.Duration) error {
+	glog.Infof("debug: watch for detach %v", devicePath)
 	ticker := time.NewTicker(checkSleepDuration)
 	defer ticker.Stop()
 	timer := time.NewTimer(timeout)
@@ -284,7 +286,7 @@ func unmountPDAndRemoveGlobalPath(globalMountPath string, mounter mount.Interfac
 	if pathExists, pathErr := pathExists(globalMountPath); pathErr != nil {
 		return fmt.Errorf("Error checking if path exists: %v", pathErr)
 	} else if !pathExists {
-		glog.V(5).Infof("Warning: Unmount skipped because path does not exist: %v", globalMountPath)
+		glog.V(5).Infof("Unmount skipped because path does not exist: %v", globalMountPath)
 		return nil
 	}
 	err := mounter.Unmount(globalMountPath)

@@ -53,7 +53,7 @@ func findDiskByLun(lun int, io ioHandler) string {
 			target, err := strconv.Atoi(arr[0])
 			// skip targets 0-2, which are used by OS disks
 			if err == nil && target > 2 {
-				l, err := strconv.Atoi(arr[2])
+				l, err := strconv.Atoi(arr[3])
 				if err == nil && lun == l {
 					// find the matching LUN
 					// read vendor and model to ensure it is a VHD disk
