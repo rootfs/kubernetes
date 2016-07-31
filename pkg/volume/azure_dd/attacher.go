@@ -229,11 +229,12 @@ func (detacher *azureDiskDetacher) Detach(dev string, hostName string) error {
 	if ind := strings.LastIndex(instanceid, "/"); ind >= 0 {
 		instanceid = instanceid[(ind + 1):]
 	}
-
+	glog.Infof("debug: detach %v from host %q", dev, instanceid)
 	err = detacher.manager.DetachDiskByName(dev, "", instanceid)
 	if err != nil {
-		glog.V(2).Infof("failed to detach azure disk %q", dev)
+		glog.V(2).Infof("failed to detach azure disk %q, err %v", dev)
 	}
+	glog.Infof("debug: detached %v", dev)
 	return err
 }
 

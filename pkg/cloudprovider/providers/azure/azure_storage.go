@@ -51,7 +51,7 @@ func (az *Cloud) AttachDisk(diskName, diskUri, vmName string, lun int32, caching
 	}
 	res, err := az.VirtualMachinesClient.CreateOrUpdate(az.ResourceGroup, vmName,
 		newVM, nil)
-	glog.V(4).Info("azure attach result:%#v", res)
+	glog.V(4).Infof("azure attach result:%#v", res)
 	return err
 }
 
@@ -63,16 +63,14 @@ func (az *Cloud) DetachDiskByLun(lun int32, vmName string) error {
 		return cloudprovider.InstanceNotFound
 	}
 	disks := *vm.Properties.StorageProfile.DataDisks
-	d := make([]compute.DataDisk, len(disks))
-	for _, disk := range disks {
+	for i, disk := range disks {
 		if disk.Lun != nil && *disk.Lun == lun {
 			// found a disk to detach
-			glog.V(4).Infof("detach disk: lun %d name %q uri %q size(GB): %d\n", *disk.Lun, *disk.Name, *disk.Vhd.URI, *disk.DiskSizeGB)
-			continue
+			glog.V(4).Info("detach disk: lun %d", *disk.Lun)
+			disks = append(disks[:i], disks[i+1:]...)
+			break
 		}
-		d = append(d, disk)
 	}
-	disks = d
 
 	newVM := compute.VirtualMachine{
 		Location: vm.Location,
@@ -84,7 +82,7 @@ func (az *Cloud) DetachDiskByLun(lun int32, vmName string) error {
 	}
 	res, err := az.VirtualMachinesClient.CreateOrUpdate(az.ResourceGroup, vmName,
 		newVM, nil)
-	glog.V(2).Info("azure detach result:%#v", res)
+	glog.V(4).Infof("azure detach result:%#v", res)
 	return err
 }
 
@@ -96,18 +94,15 @@ func (az *Cloud) DetachDiskByName(diskName, diskUri, vmName string) error {
 		return cloudprovider.InstanceNotFound
 	}
 	disks := *vm.Properties.StorageProfile.DataDisks
-	d := make([]compute.DataDisk, len(disks))
-	for _, disk := range disks {
+	for i, disk := range disks {
 		if (disk.Name != nil && diskName != "" && *disk.Name == diskName) ||
 			(disk.Vhd.URI != nil && diskUri != "" && *disk.Vhd.URI == diskUri) {
 			// found the disk
-			glog.V(4).Infof("detach disk: lun %d name %q uri %q size(GB): %d\n", *disk.Lun, *disk.Name, *disk.Vhd.URI, *disk.DiskSizeGB)
-			continue
+			glog.V(4).Infof("detach disk: lun %d name %q uri %q", *disk.Lun, diskName, diskUri)
+			disks = append(disks[:i], disks[i+1:]...)
+			break
 		}
-		d = append(d, disk)
 	}
-	disks = d
-
 	newVM := compute.VirtualMachine{
 		Location: vm.Location,
 		Properties: &compute.VirtualMachineProperties{
@@ -118,7 +113,7 @@ func (az *Cloud) DetachDiskByName(diskName, diskUri, vmName string) error {
 	}
 	res, err := az.VirtualMachinesClient.CreateOrUpdate(az.ResourceGroup, vmName,
 		newVM, nil)
-	glog.V(2).Info("azure detach result:%#v", res)
+	glog.V(4).Infof("azure detach result:%#v, err %v", res, err)
 	return err
 }
 
@@ -135,7 +130,7 @@ func (az *Cloud) GetDiskLun(diskName, diskUri, vmName string) (int32, error) {
 			if (disk.Name != nil && diskName != "" && *disk.Name == diskName) ||
 				(disk.Vhd.URI != nil && diskUri != "" && *disk.Vhd.URI == diskUri) {
 				// found the disk
-				glog.V(4).Infof("find disk: lun %d name %q uri %q size(GB): %d\n", *disk.Lun, *disk.Name, *disk.Vhd.URI, *disk.DiskSizeGB)
+				glog.V(4).Infof("find disk: lun %d name %q uri %q", *disk.Lun, diskName, diskUri)
 				return *disk.Lun, nil
 			}
 		}
