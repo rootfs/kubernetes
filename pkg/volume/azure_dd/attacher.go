@@ -46,7 +46,6 @@ const (
 )
 
 func (plugin *azureDataDiskPlugin) NewAttacher() (volume.Attacher, error) {
-	glog.Infof("debug: new attacher")
 	azure, err := getAzureDiskManager(plugin.host.GetCloudProvider())
 	if err != nil {
 		glog.Infof("failed to get azure provider")
@@ -60,7 +59,6 @@ func (plugin *azureDataDiskPlugin) NewAttacher() (volume.Attacher, error) {
 }
 
 func (attacher *azureDiskAttacher) Attach(spec *volume.Spec, hostName string) (string, error) {
-	glog.Infof("debug: attach")
 	volumeSource, err := getVolumeSource(spec)
 	if err != nil {
 		glog.Infof("failed to get azure disk spec")
@@ -86,15 +84,13 @@ func (attacher *azureDiskAttacher) Attach(spec *volume.Spec, hostName string) (s
 	if err == nil {
 		// Volume is already attached to node.
 		glog.Infof("Attach operation is successful. volume %q is already attached to node %q at lun %d.", volumeSource.DiskName, instanceid, lun)
-
 	} else {
-		glog.Infof("debug: attaching disk")
+		//FIXME: hold lock
 		lun, err = attacher.manager.GetNextDiskLun(instanceid)
 		if err != nil {
 			glog.Warningf("no LUN available for instance %q", instanceid)
 			return "", fmt.Errorf("all LUNs are used, cannot attach volume %q to instance %q", volumeSource.DiskName, instanceid)
 		}
-		glog.Infof("debug: attaching lun %v", lun)
 
 		err = attacher.manager.AttachDisk(volumeSource.DiskName, volumeSource.DataDiskURI, instanceid, lun, compute.CachingTypes(volumeSource.CachingMode))
 		if err == nil {
@@ -105,12 +101,10 @@ func (attacher *azureDiskAttacher) Attach(spec *volume.Spec, hostName string) (s
 		}
 	}
 
-	glog.Infof("debug: lun %d attached", lun)
 	return strconv.Itoa(int(lun)), err
 }
 
 func (attacher *azureDiskAttacher) WaitForAttach(spec *volume.Spec, dev string, timeout time.Duration) (string, error) {
-	glog.Infof("debug: wait for attach")
 	volumeSource, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
@@ -119,7 +113,7 @@ func (attacher *azureDiskAttacher) WaitForAttach(spec *volume.Spec, dev string, 
 	if dev == "" {
 		return "", fmt.Errorf("WaitForAttach failed for Azure disk %q: devicePath is empty.", volumeSource.DiskName)
 	}
-	glog.V(4).Infof("wait for lun %q", dev)
+
 	lun, err := strconv.Atoi(dev)
 	if err != nil {
 		return "", fmt.Errorf("WaitForAttach: wrong lun %q", dev)
@@ -153,7 +147,6 @@ func (attacher *azureDiskAttacher) WaitForAttach(spec *volume.Spec, dev string, 
 
 func (attacher *azureDiskAttacher) GetDeviceMountPath(
 	spec *volume.Spec) (string, error) {
-	glog.Infof("debug: get device mount path")
 	volumeSource, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
@@ -164,7 +157,6 @@ func (attacher *azureDiskAttacher) GetDeviceMountPath(
 }
 
 func (attacher *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
-	glog.Infof("debug: mount device")
 	mounter := attacher.host.GetMounter()
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
@@ -218,7 +210,6 @@ func (plugin *azureDataDiskPlugin) NewDetacher() (volume.Detacher, error) {
 }
 
 func (detacher *azureDiskDetacher) Detach(dev string, hostName string) error {
-	glog.Infof("debug: detach %v", dev)
 	if dev == "" {
 		return fmt.Errorf("invalid dev to detach: %q", dev)
 	}
@@ -229,17 +220,16 @@ func (detacher *azureDiskDetacher) Detach(dev string, hostName string) error {
 	if ind := strings.LastIndex(instanceid, "/"); ind >= 0 {
 		instanceid = instanceid[(ind + 1):]
 	}
-	glog.Infof("debug: detach %v from host %q", dev, instanceid)
+	glog.Infof("detach %v from host %q", dev, instanceid)
 	err = detacher.manager.DetachDiskByName(dev, "", instanceid)
 	if err != nil {
 		glog.V(2).Infof("failed to detach azure disk %q, err %v", dev)
 	}
-	glog.Infof("debug: detached %v", dev)
+
 	return err
 }
 
 func (detacher *azureDiskDetacher) WaitForDetach(devicePath string, timeout time.Duration) error {
-	glog.Infof("debug: watch for detach %v", devicePath)
 	ticker := time.NewTicker(checkSleepDuration)
 	defer ticker.Stop()
 	timer := time.NewTimer(timeout)

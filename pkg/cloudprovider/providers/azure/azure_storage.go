@@ -51,7 +51,7 @@ func (az *Cloud) AttachDisk(diskName, diskUri, vmName string, lun int32, caching
 	}
 	res, err := az.VirtualMachinesClient.CreateOrUpdate(az.ResourceGroup, vmName,
 		newVM, nil)
-	glog.V(4).Infof("azure attach result:%#v", res)
+	glog.V(4).Infof("azure attach result:%#v, err: %v", res, err)
 	return err
 }
 
@@ -82,7 +82,7 @@ func (az *Cloud) DetachDiskByLun(lun int32, vmName string) error {
 	}
 	res, err := az.VirtualMachinesClient.CreateOrUpdate(az.ResourceGroup, vmName,
 		newVM, nil)
-	glog.V(4).Infof("azure detach result:%#v", res)
+	glog.V(4).Infof("azure detach result:%#v, err: %v", res, err)
 	return err
 }
 
@@ -113,7 +113,7 @@ func (az *Cloud) DetachDiskByName(diskName, diskUri, vmName string) error {
 	}
 	res, err := az.VirtualMachinesClient.CreateOrUpdate(az.ResourceGroup, vmName,
 		newVM, nil)
-	glog.V(4).Infof("azure detach result:%#v, err %v", res, err)
+	glog.V(4).Infof("azure detach result:%#v, err: %v", res, err)
 	return err
 }
 
