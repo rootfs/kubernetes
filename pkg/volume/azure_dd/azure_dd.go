@@ -50,13 +50,15 @@ type azureDataDiskPlugin struct {
 // azure cloud provider should implement it
 type azureManager interface {
 	// Attaches the disk to the host machine.
-	AttachDisk(diskName, diskUri, vmName string, cachingMode compute.CachingTypes) error
+	AttachDisk(diskName, diskUri, vmName string, lun int32, cachingMode compute.CachingTypes) error
 	// Detaches the disk, identified by lun, from the host machine.
 	DetachDiskByLun(lun int32, vmName string) error
 	// Detaches the disk, identified by disk name and uri, from the host machine.
 	DetachDiskByName(diskName, diskUri, vmName string) error
 	// Get the LUN number of the disk that is attached to the host
 	GetDiskLun(diskName, diskUri, vmName string) (int32, error)
+	// Get the next available LUN number to attach a new VHD
+	GetNextDiskLun(vmName string) (int32, error)
 	// InstanceID returns the cloud provider ID of the specified instance.
 	InstanceID(name string) (string, error)
 }

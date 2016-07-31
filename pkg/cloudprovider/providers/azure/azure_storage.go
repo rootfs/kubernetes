@@ -22,7 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
-func (az *Cloud) AttachDisk(diskName, diskUri, vmName string, cachingMode compute.CachingTypes) error {
+func (az *Cloud) AttachDisk(diskName, diskUri, vmName string, lun int32, cachingMode compute.CachingTypes) error {
 	vm, exists, err := az.getVirtualMachine(vmName)
 	if err != nil {
 		return err
@@ -36,6 +36,7 @@ func (az *Cloud) AttachDisk(diskName, diskUri, vmName string, cachingMode comput
 			Vhd: &compute.VirtualHardDisk{
 				URI: &diskUri,
 			},
+			Lun:          &lun,
 			Caching:      cachingMode,
 			CreateOption: "attach",
 		})
@@ -137,6 +138,28 @@ func (az *Cloud) GetDiskLun(diskName, diskUri, vmName string) (int32, error) {
 				glog.V(4).Infof("find disk: lun %d name %q uri %q size(GB): %d\n", *disk.Lun, *disk.Name, *disk.Vhd.URI, *disk.DiskSizeGB)
 				return *disk.Lun, nil
 			}
+		}
+	}
+	return -1, cloudprovider.VolumeNotFound
+}
+
+func (az *Cloud) GetNextDiskLun(vmName string) (int32, error) {
+	vm, exists, err := az.getVirtualMachine(vmName)
+	if err != nil {
+		return -1, err
+	} else if !exists {
+		return -1, cloudprovider.InstanceNotFound
+	}
+	used := make([]bool, 64)
+	disks := *vm.Properties.StorageProfile.DataDisks
+	for _, disk := range disks {
+		if disk.Lun != nil {
+			used[*disk.Lun] = true
+		}
+	}
+	for k, v := range used {
+		if !v {
+			return int32(k), nil
 		}
 	}
 	return -1, cloudprovider.VolumeNotFound

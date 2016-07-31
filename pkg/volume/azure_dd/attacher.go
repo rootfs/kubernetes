@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"strings"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
@@ -89,33 +89,24 @@ func (attacher *azureDiskAttacher) Attach(spec *volume.Spec, hostName string) (s
 
 	} else {
 		glog.Infof("debug: attaching disk")
-		err = attacher.manager.AttachDisk(volumeSource.DiskName, volumeSource.DataDiskURI, instanceid, compute.CachingTypes(volumeSource.CachingMode))
+		lun, err = attacher.manager.GetNextDiskLun(instanceid)
+		if err != nil {
+			glog.Warningf("no LUN available for instance %q", instanceid)
+			return "", fmt.Errorf("all LUNs are used, cannot attach volume %q to instance %q", volumeSource.DiskName, instanceid)
+		}
+		glog.Infof("debug: attaching lun %v", lun)
+
+		err = attacher.manager.AttachDisk(volumeSource.DiskName, volumeSource.DataDiskURI, instanceid, lun, compute.CachingTypes(volumeSource.CachingMode))
 		if err == nil {
 			glog.Infof("Attach operation successful: volume %q attached to node %q.", volumeSource.DataDiskURI, instanceid)
-			lun, err = attacher.manager.GetDiskLun(volumeSource.DiskName, volumeSource.DataDiskURI, instanceid)
-			if err != nil {
-				glog.Warningf(
-					"Error getting LUN from volume %q. err=%v",
-					volumeSource.DataDiskURI, err)
-			}
-			// should reach here
-			// detach disk and return
-			glog.Infof("detach disk %q", volumeSource.DiskName)
-			attacher.manager.DetachDiskByName(volumeSource.DiskName, volumeSource.DataDiskURI, instanceid)
-			return "", fmt.Errorf("failed to get LUN after attach: volume %q node %q", volumeSource.DiskName, instanceid)
 		} else {
 			glog.Infof("Attach volume %q to instance %q failed with %v", volumeSource.DataDiskURI, instanceid, err)
 			return "", fmt.Errorf("Attach volume %q to instance %q failed with %v", volumeSource.DiskName, instanceid, err)
 		}
 	}
-	// azure VM property doesn't return device path
-	// return LUN for now and let node find the device later
-	lunStr := ""
-	if lun >= 0 {
-		lunStr = strconv.Itoa(int(lun))
-	}
-	glog.Infof("debug: attach lun %d", lun)
-	return lunStr, err
+
+	glog.Infof("debug: lun %d attached", lun)
+	return strconv.Itoa(int(lun)), err
 }
 
 func (attacher *azureDiskAttacher) WaitForAttach(spec *volume.Spec, dev string, timeout time.Duration) (string, error) {
