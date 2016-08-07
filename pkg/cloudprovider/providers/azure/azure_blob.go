@@ -27,6 +27,7 @@ const (
 	vhdContainerName = "vhds"
 	useHttps         = true
 	blobServiceName  = "blob"
+	vhdHeaderSize    = 512
 )
 
 // switch to asm mode for blob service
@@ -36,12 +37,24 @@ func (az *Cloud) createVhdBlob(accountName, accountKey, name string, sizeGB int6
 	blobClient, err := az.getBlobClient(accountName, accountKey)
 	if err == nil {
 		size := 1024 * 1024 * 1024 * sizeGB
+		vhdSize := size + vhdHeaderSize /* header size */
 		// Blob name in URL must end with '.vhd' extension.
 		name = name + ".vhd"
-		err = blobClient.PutPageBlob(vhdContainerName, name, size, tags)
+		err = blobClient.PutPageBlob(vhdContainerName, name, vhdSize, tags)
 		if err != nil {
 			return "", "", fmt.Errorf("failed to put page blob: %v", err)
 		}
+		// add VHD signature to the blob
+		h, err := createVHDHeader(uint64(size))
+		if err != nil {
+			az.deleteVhdBlob(accountName, accountKey, name)
+			return "", "", fmt.Errorf("failed to create vhd header, err: %v", err)
+		}
+		if err = blobClient.PutPage(vhdContainerName, name, size, vhdSize-1, azs.PageWriteTypeUpdate, h[:vhdHeaderSize], nil); err != nil {
+			az.deleteVhdBlob(accountName, accountKey, name)
+			return "", "", fmt.Errorf("failed to update vhd header, err: %v", err)
+		}
+
 		scheme := "http"
 		if useHttps {
 			scheme = "https"
