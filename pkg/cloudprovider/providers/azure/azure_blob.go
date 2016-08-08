@@ -27,7 +27,6 @@ const (
 	vhdContainerName = "vhds"
 	useHttps         = true
 	blobServiceName  = "blob"
-	vhdHeaderSize    = 512
 )
 
 // switch to asm mode for blob service

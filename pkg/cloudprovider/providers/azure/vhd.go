@@ -23,6 +23,10 @@ import (
 	"github.com/rootfs/go-vhd/vhd"
 )
 
+const (
+	vhdHeaderSize = vhd.VHD_HEADER_SIZE
+)
+
 func createVHDHeader(size uint64) ([]byte, error) {
 	h := vhd.CreateFixedHeader(size, &vhd.VHDOptions{})
 	b := new(bytes.Buffer)
