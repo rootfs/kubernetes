@@ -20,7 +20,7 @@ import (
 	"bytes"
 	"encoding/binary"
 
-	"github.com/rootfs/go-vhd/vhd"
+	"github.com/rubiojr/go-vhd/vhd"
 )
 
 const (
