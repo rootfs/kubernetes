@@ -148,6 +148,29 @@ func (plugin *azureDataDiskPlugin) newUnmounterInternal(volName string, podUID t
 	}, nil
 }
 
+func (plugin *azureDataDiskPlugin) ConstructVolumeSpec(volName, mountPath string) (*volume.Spec, error) {
+	mounter := plugin.host.GetMounter()
+	pluginDir := plugin.host.GetPluginDir(plugin.GetPluginName())
+	sourceName, err := mounter.GetDeviceNameFromMount(mountPath, pluginDir)
+	if err != nil {
+		return nil, err
+	}
+	azVolume := &api.Volume{
+		Name: volName,
+		VolumeSource: api.VolumeSource{
+			AzureDisk: &api.AzureDiskVolumeSource{
+				DiskName: sourceName,
+			},
+		},
+	}
+	return volume.NewSpecFromVolume(azVolume), nil
+}
+
+func (plugin *azureDataDiskPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
+	mounter := plugin.host.GetMounter()
+	return mount.GetMountRefs(mounter, deviceMountPath)
+}
+
 type azureDisk struct {
 	volName     string
 	podUID      types.UID
