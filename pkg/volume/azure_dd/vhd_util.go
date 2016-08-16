@@ -45,7 +45,7 @@ func (handler *osIOHandler) WriteFile(filename string, data []byte, perm os.File
 // given a LUN find the VHD device path like /dev/sdb
 // VHD disks under sysfs are like /sys/bus/scsi/devices/3:0:1:0
 // return empty string if no disk is found
-func findDiskByLun(lun int, io ioHandler) (string, error) {
+func findDiskByLun(lun int, io ioHandler, exe exec.Interface) (string, error) {
 	var err error
 	sys_path := "/sys/bus/scsi/devices"
 	if dirs, err := io.ReadDir(sys_path); err == nil {
@@ -75,7 +75,6 @@ func findDiskByLun(lun int, io ioHandler) (string, error) {
 					// read vendor and model to ensure it is a VHD disk
 					vendor := path.Join(sys_path, name, "vendor")
 					model := path.Join(sys_path, name, "model")
-					exe := exec.New()
 					out, err := exe.Command("cat", vendor, model).CombinedOutput()
 					if err != nil {
 						glog.Errorf("failed to cat device vendor and model, err: %v", err)

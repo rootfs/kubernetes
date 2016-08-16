@@ -129,12 +129,13 @@ func (attacher *azureDiskAttacher) WaitForAttach(spec *volume.Spec, lunStr strin
 	defer ticker.Stop()
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
+	exe := exec.New()
 
 	for {
 		select {
 		case <-ticker.C:
 			glog.V(4).Infof("Checking Azure disk %q(lun %s) is attached.", volumeSource.DiskName, lunStr)
-			if devicePath, err := findDiskByLun(lun, &osIOHandler{}); err == nil {
+			if devicePath, err := findDiskByLun(lun, &osIOHandler{}, exe); err == nil {
 				glog.V(4).Infof("Successfully found attached Azure disk %q(lun %s, device path %s).", volumeSource.DiskName, lunStr, devicePath)
 				return devicePath, nil
 			} else {
