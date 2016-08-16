@@ -29,8 +29,8 @@ const (
 )
 
 // AttachDisk attaches a vhd to vm
-// the vhd must exist, can be identified by diskName, diskUri, and lun.
-func (az *Cloud) AttachDisk(diskName, diskUri, vmName string, lun int32, cachingMode compute.CachingTypes) error {
+// the vhd must exist, can be identified by diskName, diskURI, and lun.
+func (az *Cloud) AttachDisk(diskName, diskURI, vmName string, lun int32, cachingMode compute.CachingTypes) error {
 	vm, exists, err := az.getVirtualMachine(vmName)
 	if err != nil {
 		return err
@@ -42,7 +42,7 @@ func (az *Cloud) AttachDisk(diskName, diskUri, vmName string, lun int32, caching
 		compute.DataDisk{
 			Name: &diskName,
 			Vhd: &compute.VirtualHardDisk{
-				URI: &diskUri,
+				URI: &diskURI,
 			},
 			Lun:          &lun,
 			Caching:      cachingMode,
@@ -63,8 +63,8 @@ func (az *Cloud) AttachDisk(diskName, diskUri, vmName string, lun int32, caching
 }
 
 // DetachDiskByName detaches a vhd from host
-// the vhd can be identified by diskName or diskUri
-func (az *Cloud) DetachDiskByName(diskName, diskUri, vmName string) error {
+// the vhd can be identified by diskName or diskURI
+func (az *Cloud) DetachDiskByName(diskName, diskURI, vmName string) error {
 	vm, exists, err := az.getVirtualMachine(vmName)
 	if err != nil {
 		return err
@@ -73,9 +73,9 @@ func (az *Cloud) DetachDiskByName(diskName, diskUri, vmName string) error {
 	}
 	disks := *vm.Properties.StorageProfile.DataDisks
 	for i, disk := range disks {
-		if (disk.Name != nil && diskName != "" && *disk.Name == diskName) || (disk.Vhd.URI != nil && diskUri != "" && *disk.Vhd.URI == diskUri) {
+		if (disk.Name != nil && diskName != "" && *disk.Name == diskName) || (disk.Vhd.URI != nil && diskURI != "" && *disk.Vhd.URI == diskURI) {
 			// found the disk
-			glog.V(4).Infof("detach disk: name %q uri %q", diskName, diskUri)
+			glog.V(4).Infof("detach disk: name %q uri %q", diskName, diskURI)
 			disks = append(disks[:i], disks[i+1:]...)
 			break
 		}
@@ -93,8 +93,8 @@ func (az *Cloud) DetachDiskByName(diskName, diskUri, vmName string) error {
 	return err
 }
 
-// GetDiskLun finds the lun on the host that the vhd is attached to, given a vhd's diskName and diskUri
-func (az *Cloud) GetDiskLun(diskName, diskUri, vmName string) (int32, error) {
+// GetDiskLun finds the lun on the host that the vhd is attached to, given a vhd's diskName and diskURI
+func (az *Cloud) GetDiskLun(diskName, diskURI, vmName string) (int32, error) {
 	vm, exists, err := az.getVirtualMachine(vmName)
 	if err != nil {
 		return -1, err
@@ -104,9 +104,9 @@ func (az *Cloud) GetDiskLun(diskName, diskUri, vmName string) (int32, error) {
 	disks := *vm.Properties.StorageProfile.DataDisks
 	for _, disk := range disks {
 		if disk.Lun != nil {
-			if (disk.Name != nil && diskName != "" && *disk.Name == diskName) || (disk.Vhd.URI != nil && diskUri != "" && *disk.Vhd.URI == diskUri) {
+			if (disk.Name != nil && diskName != "" && *disk.Name == diskName) || (disk.Vhd.URI != nil && diskURI != "" && *disk.Vhd.URI == diskURI) {
 				// found the disk
-				glog.V(4).Infof("find disk: lun %d name %q uri %q", *disk.Lun, diskName, diskUri)
+				glog.V(4).Infof("find disk: lun %d name %q uri %q", *disk.Lun, diskName, diskURI)
 				return *disk.Lun, nil
 			}
 		}
