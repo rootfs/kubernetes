@@ -28,7 +28,7 @@ const (
 	maxLUN = 64 // max number of LUNs per VM
 )
 
-// attach a vhd to vm
+// AttachDisk attaches a vhd to vm
 // the vhd must exist, can be identified by diskName, diskUri, and lun.
 func (az *Cloud) AttachDisk(diskName, diskUri, vmName string, lun int32, cachingMode compute.CachingTypes) error {
 	vm, exists, err := az.getVirtualMachine(vmName)
@@ -62,7 +62,7 @@ func (az *Cloud) AttachDisk(diskName, diskUri, vmName string, lun int32, caching
 	return err
 }
 
-// detach a vhd from host
+// DetachDiskByName detaches a vhd from host
 // the vhd can be identified by diskName or diskUri
 func (az *Cloud) DetachDiskByName(diskName, diskUri, vmName string) error {
 	vm, exists, err := az.getVirtualMachine(vmName)
@@ -93,7 +93,7 @@ func (az *Cloud) DetachDiskByName(diskName, diskUri, vmName string) error {
 	return err
 }
 
-// given a vhd's diskName and diskUri, find the lun on the host that the vhd is attached to
+// GetDiskLun finds the lun on the host that the vhd is attached to, given a vhd's diskName and diskUri
 func (az *Cloud) GetDiskLun(diskName, diskUri, vmName string) (int32, error) {
 	vm, exists, err := az.getVirtualMachine(vmName)
 	if err != nil {
@@ -114,7 +114,7 @@ func (az *Cloud) GetDiskLun(diskName, diskUri, vmName string) (int32, error) {
 	return -1, fmt.Errorf("Cannot find Lun for disk %s", diskName)
 }
 
-// search all vhd attachment on the host and find unused lun
+// GetNextDiskLun searches all vhd attachment on the host and find unused lun
 // return -1 if all luns are used
 func (az *Cloud) GetNextDiskLun(vmName string) (int32, error) {
 	vm, exists, err := az.getVirtualMachine(vmName)
