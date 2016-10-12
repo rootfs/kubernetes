@@ -146,14 +146,23 @@ func (detacher *rbdDetacher) Detach(deviceMountPath string, hostName string, spe
 }
 
 func (detacher *rbdDetacher) WaitForDetach(devicePath string, timeout time.Duration) error {
-	glog.V(4).Infof("unmap %v", devicePath)
-	return detacher.manager.DetachDisk(detacher.plugin, devicePath)
-
+	return nil
 }
 
 func (detacher *rbdDetacher) UnmountDevice(deviceMountPath string) error {
 	glog.V(4).Infof("unmount %v", deviceMountPath)
-	return volumeutil.UnmountPath(deviceMountPath, detacher.mounter)
+	devicePath, _, _ := mount.GetDeviceNameFromMount(detacher.mounter, deviceMountPath)
+	// unmount device
+	err := volumeutil.UnmountPath(deviceMountPath, detacher.mounter)
+	if err != nil {
+		return err
+	}
+	// unmap (i.e. detach) device
+	if len(devicePath) > 0 {
+		glog.V(4).Infof("unmap %v", devicePath)
+		detacher.manager.DetachDisk(detacher.plugin, devicePath)
+	}
+	return nil
 }
 
 func volumeSpecToMounter(spec *volume.Spec, plugin *rbdPlugin) (*rbdMounter, error) {
