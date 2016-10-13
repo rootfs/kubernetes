@@ -980,8 +980,7 @@ func (ctrl *PersistentVolumeController) recycleVolumeOperation(arg interface{}) 
 	volume = newVolume
 
 	// Find a plugin.
-	// no namespace to passed into VolumeSpec. This is fine because recyclers (NFS, hostPath) don't use namespace'd resource yet
-	spec := vol.NewSpecFromPersistentVolume(volume, false, "")
+	spec := vol.NewSpecFromPersistentVolume(volume, false)
 	plugin, err := ctrl.volumePluginMgr.FindRecyclablePluginBySpec(spec)
 	if err != nil {
 		// No recycler found. Emit an event and mark the volume Failed.
@@ -1169,8 +1168,7 @@ func (ctrl *PersistentVolumeController) doDeleteVolume(volume *api.PersistentVol
 
 	// Plugin found
 	glog.V(5).Infof("found a deleter plugin %q for volume %q", plugin.GetPluginName(), volume.Name)
-	// no namespace passed into VolumeSpec. Deleters are expect to find namespace'd resource from e.g. annotations
-	spec := vol.NewSpecFromPersistentVolume(volume, false, "")
+	spec := vol.NewSpecFromPersistentVolume(volume, false)
 	deleter, err := plugin.NewDeleter(spec)
 	if err != nil {
 		// Cannot create deleter
@@ -1491,7 +1489,7 @@ func (ctrl *PersistentVolumeController) findDeletablePlugin(volume *api.Persiste
 
 	// The plugin that provisioned the volume was not found or the volume
 	// was not dynamically provisioned. Try to find a plugin by spec.
-	spec := vol.NewSpecFromPersistentVolume(volume, false, "")
+	spec := vol.NewSpecFromPersistentVolume(volume, false)
 	plugin, err := ctrl.volumePluginMgr.FindDeletablePluginBySpec(spec)
 	if err != nil {
 		// No deleter found. Emit an event and mark the volume Failed.
