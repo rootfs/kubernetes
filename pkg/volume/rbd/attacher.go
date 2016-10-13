@@ -27,6 +27,7 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
@@ -56,14 +57,14 @@ func (plugin *rbdPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, e
 	return mount.GetMountRefs(mounter, deviceMountPath)
 }
 
-func (attacher *rbdAttacher) Attach(spec *volume.Spec, hostName string) (string, error) {
+func (attacher *rbdAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
 	mounter, err := volumeSpecToMounter(spec, attacher.plugin)
 	if err != nil {
 		glog.Warningf("failed to get rbd mounter: %v", err)
 		return "", err
 	}
 	id := "/dev/" + mounter.Pool + "/" + mounter.Image
-	return id, attacher.locker.Fencing(*mounter, hostName)
+	return id, attacher.locker.Fencing(*mounter, string(nodeName))
 }
 
 func (attacher *rbdAttacher) WaitForAttach(spec *volume.Spec, _ string, timeout time.Duration) (string, error) {
@@ -135,14 +136,14 @@ func (plugin *rbdPlugin) NewDetacher() (volume.Detacher, error) {
 	}, nil
 }
 
-func (detacher *rbdDetacher) Detach(deviceMountPath string, hostName string, spec *volume.Spec) error {
-	glog.V(4).Infof("detaching %v from %s", deviceMountPath, hostName)
+func (detacher *rbdDetacher) Detach(deviceMountPath string, nodeName types.NodeName, spec *volume.Spec) error {
+	glog.V(4).Infof("detaching %v from %s", deviceMountPath, nodeName)
 	mounter, err := volumeSpecToMounter(spec, detacher.plugin)
 	if err != nil {
 		glog.Warningf("failed to get rbd mounter: %v", err)
 		return err
 	}
-	return detacher.locker.Defencing(*mounter, hostName)
+	return detacher.locker.Defencing(*mounter, string(nodeName))
 }
 
 func (detacher *rbdDetacher) WaitForDetach(devicePath string, timeout time.Duration) error {
