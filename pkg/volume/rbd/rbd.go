@@ -173,7 +173,7 @@ func (plugin *rbdPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*vol
 			},
 		},
 	}
-	return volume.NewSpecFromVolume(rbdVolume, ""), nil
+	return volume.NewSpecFromVolume(rbdVolume), nil
 }
 
 func (plugin *rbdPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
