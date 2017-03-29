@@ -131,6 +131,22 @@ func (util *RBDUtil) rbdLock(b rbdMounter, lock bool) error {
 	// iterate all hosts until mount succeeds.
 	for i := start; i < start+l; i++ {
 		mon := b.Mon[i%l]
+		// use exclusive lock if it is enabled on the image
+		cmd, err = b.plugin.execCommand("rbd",
+			append([]string{"info", b.Image, "--pool", b.Pool, "--id", b.Id, "-m", mon}, secret_opt...))
+		output = string(cmd)
+		glog.Infof("rbd info output %q", output)
+		if err != nil {
+			continue
+		}
+		// detect if the image has feature exclusive lock, search pattern:
+		// features: exclusive-lock
+		matched, err := regexp.MatchString("features:"+".*exclusive-lock.*", string(output))
+		if err == nil && matched {
+			// exclusive lock is turned on, no need to place advisory lock
+			return nil
+		}
+
 		// cmd "rbd lock list" serves two purposes:
 		// for fencing, check if lock already held for this host
 		// this edge case happens if host crashes in the middle of acquiring lock and mounting rbd
@@ -356,8 +372,16 @@ func (util *RBDUtil) CreateImage(p *rbdVolumeProvisioner) (r *v1.RBDVolumeSource
 	for i := start; i < start+l; i++ {
 		mon := p.Mon[i%l]
 		glog.V(4).Infof("rbd: create %s size %s using mon %s, pool %s id %s key %s", p.rbdMounter.Image, volSz, mon, p.rbdMounter.Pool, p.rbdMounter.adminId, p.rbdMounter.adminSecret)
-		output, err = p.rbdMounter.plugin.execCommand("rbd",
-			[]string{"create", p.rbdMounter.Image, "--size", volSz, "--pool", p.rbdMounter.Pool, "--id", p.rbdMounter.adminId, "-m", mon, "--key=" + p.rbdMounter.adminSecret, "--image-format", "1"})
+		// create feature array
+		// if no feature, use image format 1 for backward compatibility
+		// otherwise, use image format 2 and append features
+		if len(p.features) == 0 {
+			output, err = p.rbdMounter.plugin.execCommand("rbd",
+				[]string{"create", p.rbdMounter.Image, "--size", volSz, "--pool", p.rbdMounter.Pool, "--id", p.rbdMounter.adminId, "-m", mon, "--key=" + p.rbdMounter.adminSecret, "--image-format", "1"})
+		} else {
+			output, err = p.rbdMounter.plugin.execCommand("rbd",
+				[]string{"create", p.rbdMounter.Image, "--size", volSz, "--pool", p.rbdMounter.Pool, "--id", p.rbdMounter.adminId, "-m", mon, "--key=" + p.rbdMounter.adminSecret, "--image-format", "2", "--image-feature", p.features})
+		}
 		if err == nil {
 			break
 		} else {
@@ -368,7 +392,6 @@ func (util *RBDUtil) CreateImage(p *rbdVolumeProvisioner) (r *v1.RBDVolumeSource
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to create rbd image: %v, command output: %s", err, string(output))
 	}
-
 	return &v1.RBDVolumeSource{
 		CephMonitors: p.rbdMounter.Mon,
 		RBDImage:     p.rbdMounter.Image,
