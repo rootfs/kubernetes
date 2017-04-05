@@ -18017,6 +18017,10 @@
       "$ref": "v1.ScaleIOVolumeSource",
       "description": "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes."
      },
+     "localPV": {
+      "$ref": "v1.LocalPVVolumeSource",
+      "description": "LocalPV represents local block or file PV on Kubernetes nodes."
+     },
      "accessModes": {
       "type": "array",
       "items": {
@@ -18564,6 +18568,21 @@
      "readOnly": {
       "type": "boolean",
       "description": "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts."
+     }
+    }
+   },
+   "v1.LocalPVVolumeSource": {
+    "id": "v1.LocalPVVolumeSource",
+    "required": [
+     "medium",
+     "path"
+    ],
+    "properties": {
+     "medium": {
+      "type": "string"
+     },
+     "path": {
+      "type": "string"
      }
     }
    },

@@ -4332,6 +4332,28 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			},
 			Dependencies: []string{},
 		},
+		"k8s.io/kubernetes/pkg/api/v1.LocalPVVolumeSource": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Properties: map[string]spec.Schema{
+						"medium": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"string"},
+								Format: "",
+							},
+						},
+						"path": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"string"},
+								Format: "",
+							},
+						},
+					},
+					Required: []string{"medium", "path"},
+				},
+			},
+			Dependencies: []string{},
+		},
 		"k8s.io/kubernetes/pkg/api/v1.NFSVolumeSource": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
@@ -5605,11 +5627,17 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Ref:         ref("k8s.io/kubernetes/pkg/api/v1.ScaleIOVolumeSource"),
 							},
 						},
+						"localPV": {
+							SchemaProps: spec.SchemaProps{
+								Description: "LocalPV represents local block or file PV on Kubernetes nodes.",
+								Ref:         ref("k8s.io/kubernetes/pkg/api/v1.LocalPVVolumeSource"),
+							},
+						},
 					},
 				},
 			},
 			Dependencies: []string{
-				"k8s.io/kubernetes/pkg/api/v1.AWSElasticBlockStoreVolumeSource", "k8s.io/kubernetes/pkg/api/v1.AzureDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.AzureFileVolumeSource", "k8s.io/kubernetes/pkg/api/v1.CephFSVolumeSource", "k8s.io/kubernetes/pkg/api/v1.CinderVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FCVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FlexVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FlockerVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GCEPersistentDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GlusterfsVolumeSource", "k8s.io/kubernetes/pkg/api/v1.HostPathVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ISCSIVolumeSource", "k8s.io/kubernetes/pkg/api/v1.NFSVolumeSource", "k8s.io/kubernetes/pkg/api/v1.PhotonPersistentDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.PortworxVolumeSource", "k8s.io/kubernetes/pkg/api/v1.QuobyteVolumeSource", "k8s.io/kubernetes/pkg/api/v1.RBDVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ScaleIOVolumeSource", "k8s.io/kubernetes/pkg/api/v1.VsphereVirtualDiskVolumeSource"},
+				"k8s.io/kubernetes/pkg/api/v1.AWSElasticBlockStoreVolumeSource", "k8s.io/kubernetes/pkg/api/v1.AzureDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.AzureFileVolumeSource", "k8s.io/kubernetes/pkg/api/v1.CephFSVolumeSource", "k8s.io/kubernetes/pkg/api/v1.CinderVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FCVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FlexVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FlockerVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GCEPersistentDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GlusterfsVolumeSource", "k8s.io/kubernetes/pkg/api/v1.HostPathVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ISCSIVolumeSource", "k8s.io/kubernetes/pkg/api/v1.LocalPVVolumeSource", "k8s.io/kubernetes/pkg/api/v1.NFSVolumeSource", "k8s.io/kubernetes/pkg/api/v1.PhotonPersistentDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.PortworxVolumeSource", "k8s.io/kubernetes/pkg/api/v1.QuobyteVolumeSource", "k8s.io/kubernetes/pkg/api/v1.RBDVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ScaleIOVolumeSource", "k8s.io/kubernetes/pkg/api/v1.VsphereVirtualDiskVolumeSource"},
 		},
 		"k8s.io/kubernetes/pkg/api/v1.PersistentVolumeSpec": {
 			Schema: spec.Schema{
@@ -5743,6 +5771,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Ref:         ref("k8s.io/kubernetes/pkg/api/v1.ScaleIOVolumeSource"),
 							},
 						},
+						"localPV": {
+							SchemaProps: spec.SchemaProps{
+								Description: "LocalPV represents local block or file PV on Kubernetes nodes.",
+								Ref:         ref("k8s.io/kubernetes/pkg/api/v1.LocalPVVolumeSource"),
+							},
+						},
 						"accessModes": {
 							SchemaProps: spec.SchemaProps{
 								Description: "AccessModes contains all ways the volume can be mounted. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#access-modes",
@@ -5781,7 +5815,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 				},
 			},
 			Dependencies: []string{
-				"k8s.io/apimachinery/pkg/api/resource.Quantity", "k8s.io/kubernetes/pkg/api/v1.AWSElasticBlockStoreVolumeSource", "k8s.io/kubernetes/pkg/api/v1.AzureDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.AzureFileVolumeSource", "k8s.io/kubernetes/pkg/api/v1.CephFSVolumeSource", "k8s.io/kubernetes/pkg/api/v1.CinderVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FCVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FlexVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FlockerVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GCEPersistentDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GlusterfsVolumeSource", "k8s.io/kubernetes/pkg/api/v1.HostPathVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ISCSIVolumeSource", "k8s.io/kubernetes/pkg/api/v1.NFSVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ObjectReference", "k8s.io/kubernetes/pkg/api/v1.PhotonPersistentDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.PortworxVolumeSource", "k8s.io/kubernetes/pkg/api/v1.QuobyteVolumeSource", "k8s.io/kubernetes/pkg/api/v1.RBDVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ScaleIOVolumeSource", "k8s.io/kubernetes/pkg/api/v1.VsphereVirtualDiskVolumeSource"},
+				"k8s.io/apimachinery/pkg/api/resource.Quantity", "k8s.io/kubernetes/pkg/api/v1.AWSElasticBlockStoreVolumeSource", "k8s.io/kubernetes/pkg/api/v1.AzureDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.AzureFileVolumeSource", "k8s.io/kubernetes/pkg/api/v1.CephFSVolumeSource", "k8s.io/kubernetes/pkg/api/v1.CinderVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FCVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FlexVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FlockerVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GCEPersistentDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GlusterfsVolumeSource", "k8s.io/kubernetes/pkg/api/v1.HostPathVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ISCSIVolumeSource", "k8s.io/kubernetes/pkg/api/v1.LocalPVVolumeSource", "k8s.io/kubernetes/pkg/api/v1.NFSVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ObjectReference", "k8s.io/kubernetes/pkg/api/v1.PhotonPersistentDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.PortworxVolumeSource", "k8s.io/kubernetes/pkg/api/v1.QuobyteVolumeSource", "k8s.io/kubernetes/pkg/api/v1.RBDVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ScaleIOVolumeSource", "k8s.io/kubernetes/pkg/api/v1.VsphereVirtualDiskVolumeSource"},
 		},
 		"k8s.io/kubernetes/pkg/api/v1.PersistentVolumeStatus": {
 			Schema: spec.Schema{

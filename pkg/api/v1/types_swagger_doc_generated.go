@@ -1125,6 +1125,7 @@ var map_PersistentVolumeSource = map[string]string{
 	"photonPersistentDisk": "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine",
 	"portworxVolume":       "PortworxVolume represents a portworx volume attached and mounted on kubelets host machine",
 	"scaleIO":              "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.",
+	"localPV":              "LocalPV represents local block or file PV on Kubernetes nodes.",
 }
 
 func (PersistentVolumeSource) SwaggerDoc() map[string]string {

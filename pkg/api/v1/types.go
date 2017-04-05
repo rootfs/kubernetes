@@ -662,7 +662,7 @@ const (
 )
 
 type LocalPVVolumeSource struct {
-	MediumType LocalPVType `json:"path" protobuf:"bytes,1,opt,name=medium,casttype=LocalPVType"`
+	MediumType LocalPVType `json:"medium" protobuf:"bytes,1,opt,name=medium,casttype=LocalPVType"`
 	Path       string      `json:"path" protobuf:"bytes,2,opt,name=path"`
 }
 

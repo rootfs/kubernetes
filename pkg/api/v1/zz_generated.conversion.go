@@ -171,6 +171,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_api_LoadBalancerStatus_To_v1_LoadBalancerStatus,
 		Convert_v1_LocalObjectReference_To_api_LocalObjectReference,
 		Convert_api_LocalObjectReference_To_v1_LocalObjectReference,
+		Convert_v1_LocalPVVolumeSource_To_api_LocalPVVolumeSource,
+		Convert_api_LocalPVVolumeSource_To_v1_LocalPVVolumeSource,
 		Convert_v1_NFSVolumeSource_To_api_NFSVolumeSource,
 		Convert_api_NFSVolumeSource_To_v1_NFSVolumeSource,
 		Convert_v1_Namespace_To_api_Namespace,
@@ -1998,6 +2000,26 @@ func Convert_api_LocalObjectReference_To_v1_LocalObjectReference(in *api.LocalOb
 	return autoConvert_api_LocalObjectReference_To_v1_LocalObjectReference(in, out, s)
 }
 
+func autoConvert_v1_LocalPVVolumeSource_To_api_LocalPVVolumeSource(in *LocalPVVolumeSource, out *api.LocalPVVolumeSource, s conversion.Scope) error {
+	out.MediumType = api.LocalPVType(in.MediumType)
+	out.Path = in.Path
+	return nil
+}
+
+func Convert_v1_LocalPVVolumeSource_To_api_LocalPVVolumeSource(in *LocalPVVolumeSource, out *api.LocalPVVolumeSource, s conversion.Scope) error {
+	return autoConvert_v1_LocalPVVolumeSource_To_api_LocalPVVolumeSource(in, out, s)
+}
+
+func autoConvert_api_LocalPVVolumeSource_To_v1_LocalPVVolumeSource(in *api.LocalPVVolumeSource, out *LocalPVVolumeSource, s conversion.Scope) error {
+	out.MediumType = LocalPVType(in.MediumType)
+	out.Path = in.Path
+	return nil
+}
+
+func Convert_api_LocalPVVolumeSource_To_v1_LocalPVVolumeSource(in *api.LocalPVVolumeSource, out *LocalPVVolumeSource, s conversion.Scope) error {
+	return autoConvert_api_LocalPVVolumeSource_To_v1_LocalPVVolumeSource(in, out, s)
+}
+
 func autoConvert_v1_NFSVolumeSource_To_api_NFSVolumeSource(in *NFSVolumeSource, out *api.NFSVolumeSource, s conversion.Scope) error {
 	out.Server = in.Server
 	out.Path = in.Path
@@ -2774,6 +2796,7 @@ func autoConvert_v1_PersistentVolumeSource_To_api_PersistentVolumeSource(in *Per
 	out.PhotonPersistentDisk = (*api.PhotonPersistentDiskVolumeSource)(unsafe.Pointer(in.PhotonPersistentDisk))
 	out.PortworxVolume = (*api.PortworxVolumeSource)(unsafe.Pointer(in.PortworxVolume))
 	out.ScaleIO = (*api.ScaleIOVolumeSource)(unsafe.Pointer(in.ScaleIO))
+	out.LocalPV = (*api.LocalPVVolumeSource)(unsafe.Pointer(in.LocalPV))
 	return nil
 }
 
@@ -2801,6 +2824,7 @@ func autoConvert_api_PersistentVolumeSource_To_v1_PersistentVolumeSource(in *api
 	out.PhotonPersistentDisk = (*PhotonPersistentDiskVolumeSource)(unsafe.Pointer(in.PhotonPersistentDisk))
 	out.PortworxVolume = (*PortworxVolumeSource)(unsafe.Pointer(in.PortworxVolume))
 	out.ScaleIO = (*ScaleIOVolumeSource)(unsafe.Pointer(in.ScaleIO))
+	out.LocalPV = (*LocalPVVolumeSource)(unsafe.Pointer(in.LocalPV))
 	return nil
 }
 

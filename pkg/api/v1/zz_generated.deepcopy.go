@@ -103,6 +103,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_LoadBalancerIngress, InType: reflect.TypeOf(&LoadBalancerIngress{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_LoadBalancerStatus, InType: reflect.TypeOf(&LoadBalancerStatus{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_LocalObjectReference, InType: reflect.TypeOf(&LocalObjectReference{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_LocalPVVolumeSource, InType: reflect.TypeOf(&LocalPVVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_NFSVolumeSource, InType: reflect.TypeOf(&NFSVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Namespace, InType: reflect.TypeOf(&Namespace{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_NamespaceList, InType: reflect.TypeOf(&NamespaceList{})},
@@ -1402,6 +1403,15 @@ func DeepCopy_v1_LocalObjectReference(in interface{}, out interface{}, c *conver
 	}
 }
 
+func DeepCopy_v1_LocalPVVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*LocalPVVolumeSource)
+		out := out.(*LocalPVVolumeSource)
+		*out = *in
+		return nil
+	}
+}
+
 func DeepCopy_v1_NFSVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*NFSVolumeSource)
@@ -2033,6 +2043,11 @@ func DeepCopy_v1_PersistentVolumeSource(in interface{}, out interface{}, c *conv
 			if err := DeepCopy_v1_ScaleIOVolumeSource(*in, *out, c); err != nil {
 				return err
 			}
+		}
+		if in.LocalPV != nil {
+			in, out := &in.LocalPV, &out.LocalPV
+			*out = new(LocalPVVolumeSource)
+			**out = **in
 		}
 		return nil
 	}
