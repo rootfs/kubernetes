@@ -425,6 +425,9 @@ type PersistentVolumeSource struct {
 	// ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
 	// +optional
 	ScaleIO *ScaleIOVolumeSource `json:"scaleIO,omitempty" protobuf:"bytes,19,opt,name=scaleIO"`
+	// LocalPV represents local block or file PV on Kubernetes nodes.
+	// +optional
+	LocalPV *LocalPVVolumeSource `json:"localPV,omitempty" protobuf:"bytes,20,opt,name=localPV"`
 }
 
 const (
@@ -649,6 +652,19 @@ const (
 	// volume does not exist any longer and all data on it was lost.
 	ClaimLost PersistentVolumeClaimPhase = "Lost"
 )
+
+type LocalPVType string
+
+const (
+	BlockLVM    LocalPVType = "LVM"
+	BlockDevice LocalPVType = "BlockDevice"
+	File        LocalPVType = "File"
+)
+
+type LocalPVVolumeSource struct {
+	MediumType LocalPVType `json:"path" protobuf:"bytes,1,opt,name=medium,casttype=LocalPVType"`
+	Path       string      `json:"path" protobuf:"bytes,2,opt,name=path"`
+}
 
 // Represents a host path mapped into a pod.
 // Host path volumes do not support ownership management or SELinux relabeling.

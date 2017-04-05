@@ -370,6 +370,9 @@ type PersistentVolumeSource struct {
 	// ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
 	// +optional
 	ScaleIO *ScaleIOVolumeSource
+	// LocalPV represents a local block or file PV on the host.
+	// +optional
+	LocalPV *LocalPVVolumeSource
 }
 
 type PersistentVolumeClaimVolumeSource struct {
@@ -599,6 +602,19 @@ const (
 	// ProtocolUDP is the UDP protocol.
 	ProtocolUDP Protocol = "UDP"
 )
+
+type LocalPVType string
+
+const (
+	BlockLVM    LocalPVType = "LVM"
+	BlockDevice LocalPVType = "BlockDevice"
+	File        LocalPVType = "File"
+)
+
+type LocalPVVolumeSource struct {
+	MediumType LocalPVType
+	Path       string
+}
 
 // Represents a Persistent Disk resource in Google Compute Engine.
 //
