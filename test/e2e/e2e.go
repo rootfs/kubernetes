@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	azurecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/util/logs"
 	commontest "k8s.io/kubernetes/test/e2e/common"
@@ -82,8 +83,19 @@ func setupProviderConfig() error {
 		if cloudConfig.Zone == "" {
 			return fmt.Errorf("gce-zone must be specified for AWS")
 		}
-	}
+	case "azure":
+		if cloudConfig.Zone == "" {
+			return fmt.Errorf("gce-zone must be specified for Azure")
+		}
+		// hack. overload Zone with azure cloud config path
+		config, err := os.Open(cloudConfig.Zone)
+		if err != nil {
+			framework.Logf("Couldn't open cloud provider configuration %s: %#v",
+				cloudConfig.Zone, err)
+		}
+		cloudConfig.Provider, err = azurecloud.NewCloud(config)
 
+	}
 	return nil
 }
 
