@@ -580,7 +580,7 @@ func createPD() (string, string, error) {
 			return "", "", err
 		}
 
-		diskName, diskUri, _, err := azureCloud.CreateVolume(pdName, "" /* account */, "" /* sku */, "" /* location */, 10 /* sizeGb */)
+		diskName, diskUri, _, err := azureCloud.CreateVolume(pdName, "" /* account */, "" /* sku */, "" /* location */, 1 /* sizeGb */)
 		if err != nil {
 			return "", "", err
 		}

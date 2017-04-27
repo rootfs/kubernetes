@@ -1059,7 +1059,7 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 					volumeTestCleanup(f, config)
 				}
 			}()
-			fsType := "ext3"
+			fsType := "ext4"
 			readOnly := false
 			tests := []VolumeTest{
 				{
