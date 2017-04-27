@@ -513,24 +513,25 @@ func MakePersistentVolumeClaim(cfg PersistentVolumeClaimConfig, ns string) *v1.P
 	}
 }
 
-func CreatePDWithRetry() (string, error) {
+func CreatePDWithRetry() (string, string, error) {
 	newDiskName := ""
+	newDiskUri := ""
 	var err error
 	for start := time.Now(); time.Since(start) < PDRetryTimeout; time.Sleep(PDRetryPollTime) {
-		if newDiskName, err = createPD(); err != nil {
+		if newDiskName, newDiskUri, err = createPD(); err != nil {
 			Logf("Couldn't create a new PD. Sleeping 5 seconds (%v)", err)
 			continue
 		}
 		Logf("Successfully created a new PD: %q.", newDiskName)
 		break
 	}
-	return newDiskName, err
+	return newDiskName, newDiskUri, err
 }
 
-func DeletePDWithRetry(diskName string) {
+func DeletePDWithRetry(diskName, diskUri string) {
 	var err error
 	for start := time.Now(); time.Since(start) < PDRetryTimeout; time.Sleep(PDRetryPollTime) {
-		if err = deletePD(diskName); err != nil {
+		if err = deletePD(diskName, diskUri); err != nil {
 			Logf("Couldn't delete PD %q. Sleeping 5 seconds (%v)", diskName, err)
 			continue
 		}
@@ -540,21 +541,21 @@ func DeletePDWithRetry(diskName string) {
 	ExpectNoError(err, "Error deleting PD")
 }
 
-func createPD() (string, error) {
+func createPD() (string, string, error) {
 	if TestContext.Provider == "gce" || TestContext.Provider == "gke" {
 		pdName := fmt.Sprintf("%s-%s", TestContext.Prefix, string(uuid.NewUUID()))
 
 		gceCloud, err := GetGCECloud()
 		if err != nil {
-			return "", err
+			return "", "", err
 		}
 
 		tags := map[string]string{}
 		err = gceCloud.CreateDisk(pdName, gcecloud.DiskTypeSSD, TestContext.CloudConfig.Zone, 10 /* sizeGb */, tags)
 		if err != nil {
-			return "", err
+			return "", "", err
 		}
-		return pdName, nil
+		return pdName, "", nil
 	} else if TestContext.Provider == "aws" {
 		client := ec2.New(session.New())
 
@@ -564,20 +565,33 @@ func createPD() (string, error) {
 		request.VolumeType = aws.String(awscloud.DefaultVolumeType)
 		response, err := client.CreateVolume(request)
 		if err != nil {
-			return "", err
+			return "", "", err
 		}
 
 		az := aws.StringValue(response.AvailabilityZone)
 		awsID := aws.StringValue(response.VolumeId)
 
 		volumeName := "aws://" + az + "/" + awsID
-		return volumeName, nil
+		return volumeName, "", nil
+	} else if TestContext.Provider == "azure" {
+		pdName := fmt.Sprintf("%s-%s", TestContext.Prefix, string(uuid.NewUUID()))
+		azureCloud, err := GetAzureCloud()
+		if err != nil {
+			return "", "", err
+		}
+
+		diskName, diskUri, _, err := azureCloud.CreateVolume(pdName, "" /* account */, "" /* sku */, "" /* location */, 10 /* sizeGb */)
+		if err != nil {
+			return "", "", err
+		}
+		return diskName, diskUri, nil
+
 	} else {
-		return "", fmt.Errorf("Provider does not support volume creation")
+		return "", "", fmt.Errorf("Provider does not support volume creation")
 	}
 }
 
-func deletePD(pdName string) error {
+func deletePD(pdName, pdUri string) error {
 	if TestContext.Provider == "gce" || TestContext.Provider == "gke" {
 		gceCloud, err := GetGCECloud()
 		if err != nil {
@@ -609,6 +623,18 @@ func deletePD(pdName string) error {
 			} else {
 				return fmt.Errorf("error deleting EBS volumes: %v", err)
 			}
+		}
+		return nil
+	} else if TestContext.Provider == "azure" {
+		azureCloud, err := GetAzureCloud()
+		if err != nil {
+			return err
+		}
+
+		err = azureCloud.DeleteVolume(pdName, pdUri)
+		if err != nil {
+			Logf("failed to delete Azure volume %q: %v", pdName, err)
+			return err
 		}
 		return nil
 	} else {

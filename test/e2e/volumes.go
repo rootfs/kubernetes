@@ -814,11 +814,61 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 			}
 
 			By("creating a test gce pd volume")
-			volumeName, err := framework.CreatePDWithRetry()
+			volumeName, _, err := framework.CreatePDWithRetry()
 			Expect(err).NotTo(HaveOccurred())
 
 			defer func() {
-				framework.DeletePDWithRetry(volumeName)
+				framework.DeletePDWithRetry(volumeName, "")
+			}()
+
+			defer func() {
+				if clean {
+					framework.Logf("Running volumeTestCleanup")
+					volumeTestCleanup(f, config)
+				}
+			}()
+
+			tests := []VolumeTest{
+				{
+					volume: v1.VolumeSource{
+						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+							PDName:   volumeName,
+							FSType:   "ext3",
+							ReadOnly: false,
+						},
+					},
+					file: "index.html",
+					// Randomize index.html to make sure we don't see the
+					// content from previous test runs.
+					expectedContent: "Hello from GCE from namespace " + volumeName,
+				},
+			}
+
+			injectHtml(cs, config, tests[0].volume, tests[0].expectedContent)
+
+			fsGroup := int64(1234)
+			testVolumeClient(cs, config, &fsGroup, tests)
+		})
+	})
+
+	////////////////////////////////////////////////////////////////////////
+	// GCE PD
+	////////////////////////////////////////////////////////////////////////
+
+	framework.KubeDescribe("PD", func() {
+		It("should be mountable", func() {
+			framework.SkipUnlessProviderIs("gce", "gke")
+			config := VolumeTestConfig{
+				namespace: namespace.Name,
+				prefix:    "pd",
+			}
+
+			By("creating a test gce pd volume")
+			volumeName, _, err := framework.CreatePDWithRetry()
+			Expect(err).NotTo(HaveOccurred())
+
+			defer func() {
+				framework.DeletePDWithRetry(volumeName, "")
 			}()
 
 			defer func() {
@@ -982,4 +1032,57 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 			testVolumeClient(cs, config, &fsGroup, tests)
 		})
 	})
+
+	////////////////////////////////////////////////////////////////////////
+	// Azure Disk
+	////////////////////////////////////////////////////////////////////////
+
+	framework.KubeDescribe("Azure Disk", func() {
+		It("should be mountable", func() {
+			framework.SkipUnlessProviderIs("azure")
+			config := VolumeTestConfig{
+				namespace: namespace.Name,
+				prefix:    "pd",
+			}
+
+			By("creating a test azure disk volume")
+			diskName, diskUri, err := framework.CreatePDWithRetry()
+			Expect(err).NotTo(HaveOccurred())
+
+			defer func() {
+				framework.DeletePDWithRetry(diskName, diskUri)
+			}()
+
+			defer func() {
+				if clean {
+					framework.Logf("Running volumeTestCleanup")
+					volumeTestCleanup(f, config)
+				}
+			}()
+			fsType := "ext3"
+			readOnly := false
+			tests := []VolumeTest{
+				{
+					volume: v1.VolumeSource{
+						AzureDisk: &v1.AzureDiskVolumeSource{
+							DiskName:    diskName,
+							DataDiskURI: diskUri,
+							FSType:      &fsType,
+							ReadOnly:    &readOnly,
+						},
+					},
+					file: "index.html",
+					// Randomize index.html to make sure we don't see the
+					// content from previous test runs.
+					expectedContent: "Hello from Azure from namespace " + diskName + " at " + diskUri,
+				},
+			}
+
+			injectHtml(cs, config, tests[0].volume, tests[0].expectedContent)
+
+			fsGroup := int64(1234)
+			testVolumeClient(cs, config, &fsGroup, tests)
+		})
+	})
+
 })

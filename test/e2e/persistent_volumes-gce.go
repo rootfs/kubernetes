@@ -77,7 +77,7 @@ var _ = framework.KubeDescribe("PersistentVolumes:GCEPD [Volume]", func() {
 
 		framework.SkipUnlessProviderIs("gce", "gke")
 		By("Initializing Test Spec")
-		diskName, err = framework.CreatePDWithRetry()
+		diskName, _, err = framework.CreatePDWithRetry()
 		Expect(err).NotTo(HaveOccurred())
 		pvConfig = framework.PersistentVolumeConfig{
 			NamePrefix: "gce-",
@@ -112,7 +112,7 @@ var _ = framework.KubeDescribe("PersistentVolumes:GCEPD [Volume]", func() {
 
 	AddCleanupAction(func() {
 		if len(diskName) > 0 {
-			framework.DeletePDWithRetry(diskName)
+			framework.DeletePDWithRetry(diskName, "" /* diskUri */)
 		}
 	})
 
