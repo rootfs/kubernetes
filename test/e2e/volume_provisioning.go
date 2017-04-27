@@ -109,7 +109,7 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 
 	framework.KubeDescribe("DynamicProvisioner", func() {
 		It("should create and delete persistent volumes [Slow] [Volume]", func() {
-			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke")
+			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "azure")
 
 			By("creating a StorageClass")
 			class := newStorageClass("", "internal")
@@ -141,7 +141,7 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 
 	framework.KubeDescribe("DynamicProvisioner Beta", func() {
 		It("should create and delete persistent volumes [Slow] [Volume]", func() {
-			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke")
+			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "azure")
 
 			By("creating a StorageClass")
 			class := newBetaStorageClass("", "beta")
@@ -348,7 +348,7 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 
 		// Modifying the default storage class can be disruptive to other tests that depend on it
 		It("should be disabled by changing the default annotation[Slow] [Serial] [Disruptive] [Volume]", func() {
-			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere")
+			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
 			scName := getDefaultStorageClassName(c)
 
 			By("setting the is-default StorageClass annotation to false")
@@ -375,7 +375,7 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 
 		// Modifying the default storage class can be disruptive to other tests that depend on it
 		It("should be disabled by removing the default annotation[Slow] [Serial] [Disruptive] [Volume]", func() {
-			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere")
+			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
 			scName := getDefaultStorageClassName(c)
 
 			By("removing the is-default StorageClass annotation")
@@ -532,6 +532,8 @@ func getDefaultPluginName() string {
 		return "kubernetes.io/cinder"
 	case framework.ProviderIs("vsphere"):
 		return "kubernetes.io/vsphere-volume"
+	case framework.ProviderIs("azure"):
+		return "kubernetes.io/azure-disk"
 	}
 	return ""
 }
