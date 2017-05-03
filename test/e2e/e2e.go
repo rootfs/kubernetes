@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/util/logs"
@@ -96,6 +97,15 @@ func setupProviderConfig() error {
 				cloudConfig.ConfigFile, err)
 		}
 		cloudConfig.Provider, err = azure.NewCloud(config)
+	case "openstack":
+		if cloudConfig.ConfigFile == "" {
+			return fmt.Errorf("config-file must be specified for OpenStack")
+		}
+		cloud, err := cloudprovider.InitCloudProvider("openstack", cloudConfig.ConfigFile)
+		if err != nil {
+			return fmt.Errorf("openstack cloud provider could not be initialized: %v", err)
+		}
+		cloudConfig.Provider = cloud
 	}
 
 	return nil

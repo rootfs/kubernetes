@@ -85,6 +85,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/conditions"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	nodectlr "k8s.io/kubernetes/pkg/controller/node"
@@ -5523,6 +5524,15 @@ func GetAzureCloud() (*azure.Cloud, error) {
 	cloud, ok := TestContext.CloudConfig.Provider.(*azure.Cloud)
 	if !ok {
 		return nil, fmt.Errorf("failed to convert CloudConfig.Provider to Azure: %#v", TestContext.CloudConfig.Provider)
+	}
+	return cloud, nil
+}
+
+// GetOpenStack returns openstack cloud provider
+func GetOpenStack() (*openstack.OpenStack, error) {
+	cloud, ok := TestContext.CloudConfig.Provider.(*openstack.OpenStack)
+	if !ok {
+		return nil, fmt.Errorf("failed to convert CloudConfig.Provider to openstack: %#v", TestContext.CloudConfig.Provider)
 	}
 	return cloud, nil
 }

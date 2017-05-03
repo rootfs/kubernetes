@@ -702,6 +702,18 @@ func createPD() (string, error) {
 		}
 		return diskUri, nil
 
+	} else if TestContext.Provider == "openstack" {
+		name := fmt.Sprintf("%s-%s", TestContext.Prefix, string(uuid.NewUUID()))
+		osCloud, err := GetOpenStack()
+		if err != nil {
+			return "", err
+		}
+
+		volumeName, err := osCloud.CreateVolume(name, 1, "" /* vtype */, "" /* availability */, nil /* tags */)
+		if err != nil {
+			return "", err
+		}
+		return volumeName, nil
 	} else {
 		return "", fmt.Errorf("provider does not support volume creation")
 	}

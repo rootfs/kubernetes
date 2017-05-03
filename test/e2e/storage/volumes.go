@@ -43,7 +43,6 @@ limitations under the License.
 package storage
 
 import (
-	"os/exec"
 	"strings"
 	"time"
 
@@ -56,27 +55,6 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
-
-func DeleteCinderVolume(name string) error {
-	// Try to delete the volume for several seconds - it takes
-	// a while for the plugin to detach it.
-	var output []byte
-	var err error
-	timeout := time.Second * 120
-
-	framework.Logf("Waiting up to %v for removal of cinder volume %s", timeout, name)
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
-		output, err = exec.Command("cinder", "delete", name).CombinedOutput()
-		if err == nil {
-			framework.Logf("Cinder volume %s deleted", name)
-			return nil
-		} else {
-			framework.Logf("Failed to delete volume %s: %v", name, err)
-		}
-	}
-	framework.Logf("Giving up deleting volume %s: %v\n%s", name, err, string(output[:]))
-	return err
-}
 
 // These tests need privileged containers, which are disabled by default.
 var _ = framework.KubeDescribe("Volumes [Volume]", func() {
@@ -438,38 +416,11 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 			}
 
 			// We assume that namespace.Name is a random string
-			volumeName := namespace.Name
-			By("creating a test Cinder volume")
-			output, err := exec.Command("cinder", "create", "--display-name="+volumeName, "1").CombinedOutput()
-			outputString := string(output[:])
-			framework.Logf("cinder output:\n%s", outputString)
+			volumeID, err := framework.CreatePDWithRetry()
 			Expect(err).NotTo(HaveOccurred())
-
 			defer func() {
-				// Ignore any cleanup errors, there is not much we can do about
-				// them. They were already logged.
-				DeleteCinderVolume(volumeName)
+				framework.DeletePDWithRetry(volumeID)
 			}()
-
-			// Parse 'id'' from stdout. Expected format:
-			// |     attachments     |                  []                  |
-			// |  availability_zone  |                 nova                 |
-			// ...
-			// |          id         | 1d6ff08f-5d1c-41a4-ad72-4ef872cae685 |
-			volumeID := ""
-			for _, line := range strings.Split(outputString, "\n") {
-				fields := strings.Fields(line)
-				if len(fields) != 5 {
-					continue
-				}
-				if fields[1] != "id" {
-					continue
-				}
-				volumeID = fields[3]
-				break
-			}
-			framework.Logf("Volume ID: %s", volumeID)
-			Expect(volumeID).NotTo(Equal(""))
 
 			defer func() {
 				if clean {
@@ -490,7 +441,7 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 					File: "index.html",
 					// Randomize index.html to make sure we don't see the
 					// content from previous test runs.
-					ExpectedContent: "Hello from Cinder from namespace " + volumeName,
+					ExpectedContent: "Hello from Cinder from namespace " + namespace.Name,
 				},
 			}
 
