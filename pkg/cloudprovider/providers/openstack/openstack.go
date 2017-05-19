@@ -598,29 +598,20 @@ func (os *OpenStack) volumeService(forceVersion string) (volumeService, error) {
 
 	switch bsVersion {
 	case "v1":
-		sClient, err := openstack.NewBlockStorageV1(os.provider, gophercloud.EndpointOpts{
-			Region: os.region,
-		})
+		sClient, err := os.NewBlockStorageV1()
 		if err != nil || sClient == nil {
-			glog.Errorf("Unable to initialize cinder client for region: %s", os.region)
 			return nil, err
 		}
 		return &VolumesV1{sClient, os.bsOpts}, nil
 	case "v2":
-		sClient, err := openstack.NewBlockStorageV2(os.provider, gophercloud.EndpointOpts{
-			Region: os.region,
-		})
+		sClient, err := os.NewBlockStorageV2()
 		if err != nil || sClient == nil {
-			glog.Errorf("Unable to initialize cinder v2 client for region: %s", os.region)
 			return nil, err
 		}
 		return &VolumesV2{sClient, os.bsOpts}, nil
 	case "auto":
-		sClient, err := openstack.NewBlockStorageV1(os.provider, gophercloud.EndpointOpts{
-			Region: os.region,
-		})
+		sClient, err := os.NewBlockStorageV1()
 		if err != nil || sClient == nil {
-			glog.Errorf("Unable to initialize cinder client for region: %s", os.region)
 			return nil, err
 		}
 		availableApiVersions := []apiversions_v1.APIVersion{}
@@ -651,4 +642,26 @@ func (os *OpenStack) volumeService(forceVersion string) (volumeService, error) {
 		glog.Warningf(err_txt)
 		return nil, errors.New(err_txt)
 	}
+}
+
+func (os *OpenStack) NewBlockStorageV1() (*gophercloud.ServiceClient, error) {
+	sClient, err := openstack.NewBlockStorageV1(os.provider, gophercloud.EndpointOpts{
+		Region: os.region,
+	})
+	if err != nil || sClient == nil {
+		glog.Errorf("Unable to initialize cinder client for region: %s", os.region)
+		return nil, err
+	}
+	return sClient, err
+}
+
+func (os *OpenStack) NewBlockStorageV2() (*gophercloud.ServiceClient, error) {
+	sClient, err := openstack.NewBlockStorageV2(os.provider, gophercloud.EndpointOpts{
+		Region: os.region,
+	})
+	if err != nil || sClient == nil {
+		glog.Errorf("Unable to initialize cinder client for region: %s", os.region)
+		return nil, err
+	}
+	return sClient, err
 }
