@@ -208,3 +208,10 @@ func (f *FakeMounter) CleanSubPaths(podDir string, volumeName string) error {
 func (mounter *FakeMounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
 	return nil
 }
+func (mounter *FakeMounter) GetAbsoluteHostPath(pathname string) (string, error) {
+	return "", nil
+}
+
+func (mounter *FakeMounter) ExtractAbsoluteHostPath(pathname string) string {
+	return pathname
+}

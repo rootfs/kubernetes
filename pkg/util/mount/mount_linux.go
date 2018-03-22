@@ -798,9 +798,14 @@ func doBindSubPath(mounter Interface, subpath Subpath, kubeletPid int) (hostPath
 
 	mountSource := fmt.Sprintf("/proc/%d/fd/%v", kubeletPid, fd)
 
+	evalMountSource, err := filepath.EvalSymlinks(mountSource)
+	if err != nil {
+		return "", fmt.Errorf("evalSymlinks %q failed: %v", mountSource, err)
+	}
+	hostMountSource := mounter.ExtractAbsoluteHostPath(evalMountSource)
 	// Do the bind mount
-	glog.V(5).Infof("bind mounting %q at %q", mountSource, bindPathTarget)
-	if err = mounter.Mount(mountSource, bindPathTarget, "" /*fstype*/, []string{"bind"}); err != nil {
+	glog.V(5).Infof("bind mounting %q at %q", hostMountSource, bindPathTarget)
+	if err = mounter.Mount(hostMountSource, bindPathTarget, "" /*fstype*/, []string{"bind"}); err != nil {
 		return "", fmt.Errorf("error mounting %s: %s", subpath.Path, err)
 	}
 
@@ -1154,4 +1159,16 @@ func doSafeOpen(pathname string, base string) (int, error) {
 	parentFD = -1
 
 	return finalFD, nil
+}
+
+func (mounter *Mounter) GetAbsoluteHostPath(pathname string) (string, error) {
+	return doGetAbsoluteHostPath(pathname)
+}
+
+func (mounter *Mounter) ExtractAbsoluteHostPath(pathname string) string {
+	return pathname
+}
+
+func doGetAbsoluteHostPath(pathname string) (string, error) {
+	return filepath.EvalSymlinks(pathname)
 }

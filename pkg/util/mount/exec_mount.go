@@ -151,3 +151,11 @@ func (m *execMounter) CleanSubPaths(podDir string, volumeName string) error {
 func (m *execMounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
 	return m.wrappedMounter.SafeMakeDir(pathname, base, perm)
 }
+
+func (m *execMounter) GetAbsoluteHostPath(pathname string) (string, error) {
+	return m.wrappedMounter.GetAbsoluteHostPath(pathname)
+}
+
+func (m *execMounter) ExtractAbsoluteHostPath(pathname string) string {
+	return pathname
+}
