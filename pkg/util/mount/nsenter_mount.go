@@ -32,6 +32,8 @@ import (
 )
 
 const (
+	// hostRootFsPath is the default host rootfs bind mount path
+	hostRootFsPath = "/rootfs/"
 	// hostProcMountsPath is the default mount path for rootfs
 	hostProcMountsPath = "/rootfs/proc/1/mounts"
 	// hostProcMountinfoPath is the default mount info path for rootfs
@@ -316,5 +318,5 @@ func (mounter *NsenterMounter) PrepareSafeSubpath(subPath Subpath) (newHostPath 
 }
 
 func (mounter *NsenterMounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
-	return doSafeMakeDir(pathname, base, perm)
+	return doSafeMakeDir(filepath.Join(hostRootFsPath, pathname), filepath.Join(hostRootFsPath, base), perm)
 }
